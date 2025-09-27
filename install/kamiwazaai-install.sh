@@ -38,32 +38,11 @@ $STD apt-get install -y \
   jq
 msg_ok "Installed Core System Dependencies"
 
-# Install Python based on Ubuntu version and KamiWaza requirements
-if [[ "${UBUNTU_VERSION}" == "24.04" ]]; then
-  msg_info "Installing Python 3.10 for Ubuntu 24.04 (KamiWaza tarball installation)"
-  $STD add-apt-repository -y ppa:deadsnakes/ppa
-  $STD apt-get update
-  $STD apt-get install -y \
-    python3.10 \
-    python3.10-dev \
-    libpython3.10-dev \
-    python3.10-venv \
-    python-is-python3
-  ln -sf /usr/bin/python3.10 /usr/local/bin/python
-  msg_ok "Installed Python 3.10 for tarball installation"
-elif [[ "${UBUNTU_VERSION}" == "22.04" ]]; then
-  msg_info "Installing Python 3.10 for Ubuntu 22.04"
-  $STD apt-get install -y \
-    python3.10 \
-    python3.10-dev \
-    libpython3.10-dev \
-    python3.10-venv \
-    python-is-python3
-  msg_ok "Installed Python 3.10"
-else
-  msg_error "Unsupported Ubuntu version: ${UBUNTU_VERSION}. KamiWaza requires Ubuntu 22.04 or 24.04 LTS."
-  exit 1
-fi
+# Install Python 3.10 using the helper function
+msg_info "Installing Python 3.10 via uv"
+export PYTHON_VERSION="3.10"
+setup_uv
+msg_ok "Installed Python 3.10 via uv"
 
 msg_info "Installing Graphics & Development Libraries"
 $STD apt-get install -y \
@@ -77,14 +56,9 @@ $STD apt-get install -y \
   etcd-client
 msg_ok "Installed System Tools"
 
-msg_info "Installing Node.js 22 with NVM"
-# Install NVM
-curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash &>/dev/null
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-$STD nvm install 22
-$STD nvm use 22
+msg_info "Installing Node.js 22"
+export NODE_VERSION="22"
+setup_nodejs
 msg_ok "Installed Node.js 22"
 
 msg_info "Installing Docker Engine + Compose v2"
@@ -108,59 +82,28 @@ cp cockroach-v23.2.12.linux-amd64/cockroach /usr/local/bin/
 rm -rf cockroach-v23.2.12.linux-amd64
 msg_ok "Installed CockroachDB"
 
-msg_info "Downloading and Installing KamiWaza CE"
-# Get the latest version from available tarballs in the repository
-KAMIWAZA_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/contents/ | jq -r '.[] | select(.name | test("kamiwaza-community-.*-UbuntuLinux.tar.gz")) | .name' | sed 's/kamiwaza-community-\(.*\)-UbuntuLinux.tar.gz/\1/' | sort -V | tail -1)
-if [[ -z "$KAMIWAZA_VERSION" ]]; then
-  # Fallback to known version if API fails
-  KAMIWAZA_VERSION="0.5.0"
-fi
-mkdir -p /opt/kamiwaza && cd /opt/kamiwaza || exit
-wget -q "https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
-tar -xf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz" &>/dev/null
+msg_info "Installing KamiWaza CE via APT Package"
+# Add Kamiwaza repository to APT sources
+echo "deb [signed-by=/usr/share/keyrings/kamiwaza-archive-keyring.gpg] https://packages.kamiwaza.ai/ubuntu/ noble main" | tee /etc/apt/sources.list.d/kamiwaza.list > /dev/null
+
+# Import and install Kamiwaza GPG signing key
+curl -fsSL https://packages.kamiwaza.ai/gpg | gpg --dearmor -o /usr/share/keyrings/kamiwaza-archive-keyring.gpg
+
+# Update package database and install Kamiwaza
+$STD apt-get update
+$STD apt-get upgrade -y
+$STD apt-get install -y kamiwaza
+
+# Get the installed version for tracking
+KAMIWAZA_VERSION=$(dpkg -l | grep kamiwaza | awk '{print $3}' | head -1)
 echo "${KAMIWAZA_VERSION}" > "/opt/KamiWazaAI_version.txt"
-msg_ok "Downloaded KamiWaza CE v${KAMIWAZA_VERSION}"
+msg_ok "Installed KamiWaza CE v${KAMIWAZA_VERSION}"
 
-msg_info "Running KamiWaza Installer"
-# Set environment variables for NVM/Node.js
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-export PATH="$NVM_DIR/versions/node/v22.*/bin:$PATH"
-# Run the installer
-$STD bash install.sh --community
-msg_ok "KamiWaza Installation Completed"
+msg_info "Starting KamiWaza Service"
+$STD systemctl enable kamiwaza
+$STD systemctl start kamiwaza
+msg_ok "KamiWaza Service Started"
 
-msg_info "Starting KamiWaza Services"
-$STD bash startup/kamiwazad.sh start
-msg_ok "KamiWaza Services Started"
-
-msg_info "Creating Service Management Script"
-cat <<EOF >/usr/local/bin/kamiwaza-service
-#!/bin/bash
-cd /opt/kamiwaza
-case "\$1" in
-  start)
-    bash startup/kamiwazad.sh start
-    ;;
-  stop)
-    bash startup/kamiwazad.sh stop
-    ;;
-  restart)
-    bash startup/kamiwazad.sh stop
-    sleep 5
-    bash startup/kamiwazad.sh start
-    ;;
-  status)
-    bash startup/kamiwazad.sh status 2>/dev/null || echo "KamiWaza is not running"
-    ;;
-  *)
-    echo "Usage: \$0 {start|stop|restart|status}"
-    exit 1
-    ;;
-esac
-EOF
-chmod +x /usr/local/bin/kamiwaza-service
-msg_ok "Created Service Management Script"
 
 msg_info "Checking GPU Support"
 if command -v nvidia-smi &> /dev/null; then
@@ -202,10 +145,10 @@ msg_info "Saving Access Information"
   fi
   echo ""
   echo "Service Management:"
-  echo "Start:   kamiwaza-service start"
-  echo "Stop:    kamiwaza-service stop"
-  echo "Restart: kamiwaza-service restart"
-  echo "Status:  kamiwaza-service status"
+  echo "Start:   systemctl start kamiwaza"
+  echo "Stop:    systemctl stop kamiwaza"
+  echo "Restart: systemctl restart kamiwaza"
+  echo "Status:  systemctl status kamiwaza"
   echo ""
   echo "Installation Directory: /opt/kamiwaza"
   echo "Version: ${KAMIWAZA_VERSION}"
@@ -220,8 +163,6 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-cd /opt/kamiwaza || exit
-rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 $STD apt-get -y autoremove
 $STD apt-get -y autoclean
 msg_ok "Cleaned"
