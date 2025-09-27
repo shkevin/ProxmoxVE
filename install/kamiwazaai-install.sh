@@ -1,0 +1,223 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2021-2025 community-scripts ORG
+# Author: Kevin Cox
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://github.com/kamiwaza-ai/kamiwaza-community-edition
+
+source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+color
+verb_ip6
+catch_errors
+setting_up_container
+network_check
+update_os
+
+# Check memory requirements
+TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
+if [[ $TOTAL_MEM -lt 16000 ]]; then
+  msg_error "Insufficient memory! KamiWaza requires minimum 16GB RAM. Current: ${TOTAL_MEM}MB"
+  msg_info "Recommended: 32GB RAM for optimal performance"
+  exit 1
+fi
+msg_info "Memory check passed: ${TOTAL_MEM}MB available (16GB+ required)"
+
+# Detect Ubuntu version
+UBUNTU_VERSION=$(lsb_release -rs)
+
+msg_info "Installing Core System Dependencies"
+$STD apt-get install -y \
+  software-properties-common \
+  apt-transport-https \
+  ca-certificates \
+  curl \
+  wget \
+  gnupg \
+  lsb-release \
+  net-tools \
+  jq
+msg_ok "Installed Core System Dependencies"
+
+# Install Python based on Ubuntu version and KamiWaza requirements
+if [[ "${UBUNTU_VERSION}" == "24.04" ]]; then
+  msg_info "Installing Python 3.10 for Ubuntu 24.04 (KamiWaza tarball installation)"
+  $STD add-apt-repository -y ppa:deadsnakes/ppa
+  $STD apt-get update
+  $STD apt-get install -y \
+    python3.10 \
+    python3.10-dev \
+    libpython3.10-dev \
+    python3.10-venv \
+    python-is-python3
+  ln -sf /usr/bin/python3.10 /usr/local/bin/python
+  msg_ok "Installed Python 3.10 for tarball installation"
+elif [[ "${UBUNTU_VERSION}" == "22.04" ]]; then
+  msg_info "Installing Python 3.10 for Ubuntu 22.04"
+  $STD apt-get install -y \
+    python3.10 \
+    python3.10-dev \
+    libpython3.10-dev \
+    python3.10-venv \
+    python-is-python3
+  msg_ok "Installed Python 3.10"
+else
+  msg_error "Unsupported Ubuntu version: ${UBUNTU_VERSION}. KamiWaza requires Ubuntu 22.04 or 24.04 LTS."
+  exit 1
+fi
+
+msg_info "Installing Graphics & Development Libraries"
+$STD apt-get install -y \
+  libcairo2-dev \
+  libgirepository1.0-dev
+msg_ok "Installed Graphics & Development Libraries"
+
+msg_info "Installing System Tools"
+$STD apt-get install -y \
+  golang-cfssl \
+  etcd-client
+msg_ok "Installed System Tools"
+
+msg_info "Installing Node.js 22 with NVM"
+# Install NVM
+curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash &>/dev/null
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+$STD nvm install 22
+$STD nvm use 22
+msg_ok "Installed Node.js 22"
+
+msg_info "Installing Docker Engine + Compose v2"
+# Add Docker's official GPG key
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg &>/dev/null
+# Set up the Docker repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+$STD apt-get update
+$STD apt-get install -y docker-ce docker-ce-cli containerd.io
+# Install Docker Compose v2
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -SL "https://github.com/docker/compose/releases/download/v2.39.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose &>/dev/null
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+# Add root to docker group (container runs as root)
+usermod -aG docker root
+msg_ok "Installed Docker Engine + Compose v2"
+
+msg_info "Installing CockroachDB"
+wget -qO- https://binaries.cockroachdb.com/cockroach-v23.2.12.linux-amd64.tgz | tar xz &>/dev/null
+cp cockroach-v23.2.12.linux-amd64/cockroach /usr/local/bin/
+rm -rf cockroach-v23.2.12.linux-amd64
+msg_ok "Installed CockroachDB"
+
+msg_info "Downloading and Installing KamiWaza CE"
+# Get the latest version
+KAMIWAZA_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3)}')
+mkdir -p /opt/kamiwaza && cd /opt/kamiwaza || exit
+wget -q "https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
+tar -xf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz" &>/dev/null
+echo "${KAMIWAZA_VERSION}" > "/opt/KamiWazaAI_version.txt"
+msg_ok "Downloaded KamiWaza CE v${KAMIWAZA_VERSION}"
+
+msg_info "Running KamiWaza Installer"
+# Set environment variables for NVM/Node.js
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+export PATH="$NVM_DIR/versions/node/v22.*/bin:$PATH"
+# Run the installer
+$STD bash install.sh --community
+msg_ok "KamiWaza Installation Completed"
+
+msg_info "Starting KamiWaza Services"
+$STD bash startup/kamiwazad.sh start
+msg_ok "KamiWaza Services Started"
+
+msg_info "Creating Service Management Script"
+cat <<EOF >/usr/local/bin/kamiwaza-service
+#!/bin/bash
+cd /opt/kamiwaza
+case "\$1" in
+  start)
+    bash startup/kamiwazad.sh start
+    ;;
+  stop)
+    bash startup/kamiwazad.sh stop
+    ;;
+  restart)
+    bash startup/kamiwazad.sh stop
+    sleep 5
+    bash startup/kamiwazad.sh start
+    ;;
+  status)
+    bash startup/kamiwazad.sh status 2>/dev/null || echo "KamiWaza is not running"
+    ;;
+  *)
+    echo "Usage: \$0 {start|stop|restart|status}"
+    exit 1
+    ;;
+esac
+EOF
+chmod +x /usr/local/bin/kamiwaza-service
+msg_ok "Created Service Management Script"
+
+msg_info "Checking GPU Support"
+if command -v nvidia-smi &> /dev/null; then
+  GPU_INFO=$(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader,nounits 2>/dev/null | head -1)
+  if [[ -n "$GPU_INFO" ]]; then
+    msg_info "NVIDIA GPU detected: $GPU_INFO"
+    COMPUTE_CAP=$(echo "$GPU_INFO" | cut -d',' -f2 | tr -d ' ')
+    if (( $(echo "$COMPUTE_CAP >= 7.0" | bc -l 2>/dev/null || echo "0") )); then
+      msg_ok "GPU meets KamiWaza requirements (Compute Capability 7.0+)"
+    else
+      msg_info "GPU Compute Capability $COMPUTE_CAP may not meet requirements (7.0+ recommended)"
+    fi
+  fi
+else
+  msg_info "No NVIDIA GPU detected - CPU-only mode"
+  msg_info "For GPU support, install NVIDIA drivers and nvidia-container-toolkit"
+fi
+
+msg_info "Saving Access Information"
+{
+  echo "KamiWaza CE Access Information"
+  echo "============================="
+  echo "Web Console: https://$(hostname -I | awk '{print $1}')"
+  echo "Default Username: admin"
+  echo "Default Password: kamiwaza"
+  echo ""
+  echo "System Requirements Met:"
+  echo "- OS: Ubuntu ${UBUNTU_VERSION} LTS"
+  echo "- Memory: ${TOTAL_MEM}MB (16GB+ required)"
+  echo "- Python: 3.10 (tarball installation)"
+  echo "- Docker: Engine with Compose v2"
+  echo "- Node.js: 22 (via NVM)"
+  echo ""
+  if command -v nvidia-smi &> /dev/null; then
+    echo "GPU Support: $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo 'Not available')"
+  else
+    echo "GPU Support: Not configured (CPU-only mode)"
+    echo "For GPU acceleration: Install NVIDIA drivers >= 450.80.02"
+  fi
+  echo ""
+  echo "Service Management:"
+  echo "Start:   kamiwaza-service start"
+  echo "Stop:    kamiwaza-service stop"
+  echo "Restart: kamiwaza-service restart"
+  echo "Status:  kamiwaza-service status"
+  echo ""
+  echo "Installation Directory: /opt/kamiwaza"
+  echo "Version: ${KAMIWAZA_VERSION}"
+  echo ""
+  echo "Network Ports:"
+  echo "- 443/tcp: HTTPS primary access"
+  echo "- 51100-51199/tcp: Model deployment ports (if needed)"
+} >> ~/kamiwaza.info
+msg_ok "Saved Access Information"
+
+motd_ssh
+customize
+
+msg_info "Cleaning up"
+cd /opt/kamiwaza || exit
+rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
+$STD apt-get -y autoremove
+$STD apt-get -y autoclean
+msg_ok "Cleaned"

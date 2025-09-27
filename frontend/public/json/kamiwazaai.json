@@ -1,0 +1,52 @@
+{
+  "name": "KamiWaza AI",
+  "slug": "kamiwazaai",
+  "categories": [
+    16
+  ],
+  "date_created": "2025-01-27",
+  "type": "ct",
+  "updateable": true,
+  "privileged": true,
+  "interface_port": 443,
+  "documentation": "https://docs.kamiwaza.ai/",
+  "website": "https://kamiwaza.ai/",
+  "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons/webp/kamiwaza.webp",
+  "config_path": "/opt/kamiwaza/",
+  "description": "KamiWaza AI is a powerful self-hosted AI platform for machine learning workflows, model deployment, and AI application development with GPU acceleration support.",
+  "install_methods": [
+    {
+      "type": "default",
+      "script": "ct/kamiwazaai.sh",
+      "resources": {
+        "cpu": 8,
+        "ram": 16384,
+        "hdd": 25,
+        "os": "ubuntu",
+        "version": "24.04"
+      }
+    }
+  ],
+  "default_credentials": {
+    "username": "admin",
+    "password": "kamiwaza"
+  },
+  "notes": [
+    {
+      "text": "Minimum 16GB RAM required for KamiWaza AI to function properly",
+      "type": "warning"
+    },
+    {
+      "text": "GPU support requires NVIDIA drivers and nvidia-container-toolkit installation",
+      "type": "info"
+    },
+    {
+      "text": "Service management: `kamiwaza-service {start|stop|restart|status}`",
+      "type": "info"
+    },
+    {
+      "text": "Access credentials: `cat ~/kamiwaza.info`",
+      "type": "info"
+    }
+  ]
+}
