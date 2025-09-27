@@ -23,80 +23,80 @@ msg_info "Memory check passed: ${TOTAL_MEM}MB available (16GB+ required)"
 # Detect Ubuntu version
 UBUNTU_VERSION=$(lsb_release -rs)
 
-msg_info "Installing Core System Dependencies"
-$STD apt-get install -y \
-  software-properties-common \
-  apt-transport-https \
-  ca-certificates \
-  curl \
-  wget \
-  gnupg \
-  lsb-release \
-  net-tools \
-  jq
-msg_ok "Installed Core System Dependencies"
+# msg_info "Installing Core System Dependencies"
+# $STD apt-get install -y \
+#   software-properties-common \
+#   apt-transport-https \
+#   ca-certificates \
+#   curl \
+#   wget \
+#   gnupg \
+#   lsb-release \
+#   net-tools \
+#   jq
+# msg_ok "Installed Core System Dependencies"
 
-# Install Python 3.10 (required for KamiWaza CE)
-msg_info "Installing Python 3.10 and dependencies"
-$STD apt-get update
-$STD apt-get install -y software-properties-common
-$STD add-apt-repository -y ppa:deadsnakes/ppa
-$STD apt-get update && $STD apt-get upgrade -y
-$STD apt-get install -y \
-  python3.10 \
-  python3.10-dev \
-  python3.10-distutils \
-  python3.10-venv \
-  libpython3.10-dev \
-  libffi-dev \
-  libssl-dev \
-  build-essential \
-  pkg-config
+# # Install Python 3.10 (required for KamiWaza CE)
+# msg_info "Installing Python 3.10 and dependencies"
+# $STD apt-get update
+# $STD apt-get install -y software-properties-common
+# $STD add-apt-repository -y ppa:deadsnakes/ppa
+# $STD apt-get update && $STD apt-get upgrade -y
+# $STD apt-get install -y \
+#   python3.10 \
+#   python3.10-dev \
+#   python3.10-distutils \
+#   python3.10-venv \
+#   libpython3.10-dev \
+#   libffi-dev \
+#   libssl-dev \
+#   build-essential \
+#   pkg-config
 
-# Create a system-wide virtual environment for KamiWaza
-python3.10 -m venv /opt/kamiwaza-python
-source /opt/kamiwaza-python/bin/activate
+# # Create a system-wide virtual environment for KamiWaza
+# python3.10 -m venv /opt/kamiwaza-python
+# source /opt/kamiwaza-python/bin/activate
 
-# Install pip and dependencies in the virtual environment
-pip install --upgrade pip setuptools wheel cffi cryptography
+# # Install pip and dependencies in the virtual environment
+# pip install --upgrade pip setuptools wheel cffi cryptography
 
-# Create symlinks to make the venv python available system-wide
-ln -sf /opt/kamiwaza-python/bin/python /usr/local/bin/python
-ln -sf /opt/kamiwaza-python/bin/pip /usr/local/bin/pip
+# # Create symlinks to make the venv python available system-wide
+# ln -sf /opt/kamiwaza-python/bin/python /usr/local/bin/python
+# ln -sf /opt/kamiwaza-python/bin/pip /usr/local/bin/pip
 
-msg_ok "Installed Python 3.10 in virtual environment"
+# msg_ok "Installed Python 3.10 in virtual environment"
 
-# Install system update and core packages
-msg_info "Installing core packages"
-$STD apt-get update && $STD apt-get upgrade -y
-$STD apt-get install -y \
-  golang-cfssl \
-  python-is-python3 \
-  etcd-client \
-  net-tools \
-  curl \
-  jq \
-  libcairo2-dev \
-  libgirepository1.0-dev
+# # Install system update and core packages
+# msg_info "Installing core packages"
+# $STD apt-get update && $STD apt-get upgrade -y
+# $STD apt-get install -y \
+#   golang-cfssl \
+#   python-is-python3 \
+#   etcd-client \
+#   net-tools \
+#   curl \
+#   jq \
+#   libcairo2-dev \
+#   libgirepository1.0-dev
 
-# Ensure /usr/local/bin is in PATH permanently for all shells
-echo 'export PATH="/usr/local/bin:$PATH"' > /etc/profile.d/usr-local-bin.sh
-chmod +x /etc/profile.d/usr-local-bin.sh
+# # Ensure /usr/local/bin is in PATH permanently for all shells
+# echo 'export PATH="/usr/local/bin:$PATH"' > /etc/profile.d/usr-local-bin.sh
+# chmod +x /etc/profile.d/usr-local-bin.sh
 
-# Also add to /etc/environment for system-wide PATH (works for all contexts)
-if ! grep -q "/usr/local/bin" /etc/environment 2>/dev/null; then
-    # If /etc/environment exists and has PATH, update it
-    if [ -f /etc/environment ] && grep -q "PATH=" /etc/environment; then
-        sed -i 's|PATH="\(.*\)"|PATH="/usr/local/bin:\1"|' /etc/environment
-    else
-        # Create or append PATH to /etc/environment
-        echo 'PATH="/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' >> /etc/environment
-    fi
-fi
+# # Also add to /etc/environment for system-wide PATH (works for all contexts)
+# if ! grep -q "/usr/local/bin" /etc/environment 2>/dev/null; then
+#     # If /etc/environment exists and has PATH, update it
+#     if [ -f /etc/environment ] && grep -q "PATH=" /etc/environment; then
+#         sed -i 's|PATH="\(.*\)"|PATH="/usr/local/bin:\1"|' /etc/environment
+#     else
+#         # Create or append PATH to /etc/environment
+#         echo 'PATH="/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' >> /etc/environment
+#     fi
+# fi
 
-# Ensure /usr/local/bin is in PATH for current session
-export PATH="/usr/local/bin:$PATH"
-msg_ok "Installed core packages"
+# # Ensure /usr/local/bin is in PATH for current session
+# export PATH="/usr/local/bin:$PATH"
+# msg_ok "Installed core packages"
 
 # msg_info "Installing Node.js 22"
 # export NODE_VERSION="22"
