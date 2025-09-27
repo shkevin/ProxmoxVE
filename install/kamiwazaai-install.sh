@@ -98,179 +98,180 @@ fi
 export PATH="/usr/local/bin:$PATH"
 msg_ok "Installed core packages"
 
-msg_info "Installing Node.js 22"
-export NODE_VERSION="22"
-setup_nodejs
-msg_ok "Installed Node.js 22"
+# msg_info "Installing Node.js 22"
+# export NODE_VERSION="22"
+# setup_nodejs
+# msg_ok "Installed Node.js 22"
 
-msg_info "Installing Docker Engine + Compose v2"
-# Add Docker's official GPG key
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg &>/dev/null
+# msg_info "Installing Docker Engine + Compose v2"
+# # Add Docker's official GPG key
+# curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg &>/dev/null
 
-# Set up the Docker repository
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-$STD apt-get update
-$STD apt-get install -y docker-ce docker-ce-cli containerd.io
+# # Set up the Docker repository
+# echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+# $STD apt-get update
+# $STD apt-get install -y docker-ce docker-ce-cli containerd.io
 
-# Install Docker Compose v2
-mkdir -p /usr/local/lib/docker/cli-plugins
-curl -SL "https://github.com/docker/compose/releases/download/v2.39.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose &>/dev/null
-chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+# # Install Docker Compose v2
+# mkdir -p /usr/local/lib/docker/cli-plugins
+# curl -SL "https://github.com/docker/compose/releases/download/v2.39.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose &>/dev/null
+# chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-# Add root to docker group (container runs as root)
-usermod -aG docker root
-msg_ok "Installed Docker Engine + Compose v2"
+# # Add root to docker group (container runs as root)
+# usermod -aG docker root
+# msg_ok "Installed Docker Engine + Compose v2"
 
-msg_info "Installing CockroachDB"
-# Install CockroachDB as per official KamiWaza guide
-wget -qO- https://binaries.cockroachdb.com/cockroach-v23.2.12.linux-amd64.tgz | tar xvz &>/dev/null
-cp cockroach-v23.2.12.linux-amd64/cockroach /usr/local/bin/
-chmod +x /usr/local/bin/cockroach
-rm -rf cockroach-v23.2.12.linux-amd64
-msg_ok "Installed CockroachDB"
+# msg_info "Installing CockroachDB"
+# # Install CockroachDB as per official KamiWaza guide
+# wget -qO- https://binaries.cockroachdb.com/cockroach-v23.2.12.linux-amd64.tgz | tar xvz &>/dev/null
+# cp cockroach-v23.2.12.linux-amd64/cockroach /usr/local/bin/
+# chmod +x /usr/local/bin/cockroach
+# rm -rf cockroach-v23.2.12.linux-amd64
+# msg_ok "Installed CockroachDB"
 
-msg_info "Installing KamiWaza CE via Tarball"
-# Get the latest version from available tarballs in the repository
-KAMIWAZA_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/contents/ | jq -r '.[] | select(.name | test("kamiwaza-community-.*-UbuntuLinux.tar.gz")) | .name' | sed 's/kamiwaza-community-\(.*\)-UbuntuLinux.tar.gz/\1/' | sort -V | tail -1)
-if [[ -z "$KAMIWAZA_VERSION" ]]; then
-  # Fallback to known version if API fails
-  KAMIWAZA_VERSION="0.5.0"
-fi
-mkdir -p /opt/kamiwaza && cd /opt/kamiwaza || exit
-wget -q "https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
-tar -xf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz" &>/dev/null
-echo "${KAMIWAZA_VERSION}" > "/opt/KamiWazaAI_version.txt"
-msg_ok "Downloaded KamiWaza CE v${KAMIWAZA_VERSION}"
+# msg_info "Installing KamiWaza CE via Tarball"
+# # Get the latest version from available tarballs in the repository
+# KAMIWAZA_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/contents/ | jq -r '.[] | select(.name | test("kamiwaza-community-.*-UbuntuLinux.tar.gz")) | .name' | sed 's/kamiwaza-community-\(.*\)-UbuntuLinux.tar.gz/\1/' | sort -V | tail -1)
+# if [[ -z "$KAMIWAZA_VERSION" ]]; then
+#   # Fallback to known version if API fails
+#   KAMIWAZA_VERSION="0.5.0"
+# fi
+# mkdir -p /opt/kamiwaza && cd /opt/kamiwaza || exit
+# wget -q "https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
+# tar -xf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz" &>/dev/null
+# echo "${KAMIWAZA_VERSION}" > "/opt/KamiWazaAI_version.txt"
+# msg_ok "Downloaded KamiWaza CE v${KAMIWAZA_VERSION}"
 
-msg_info "Running KamiWaza Installer"
-# Ensure we're using the correct Python environment
-if [ -f /opt/kamiwaza-python/bin/activate ]; then
-    source /opt/kamiwaza-python/bin/activate
-fi
+# msg_info "Running KamiWaza Installer"
+# # Ensure we're using the correct Python environment
+# if [ -f /opt/kamiwaza-python/bin/activate ]; then
+#     source /opt/kamiwaza-python/bin/activate
+# fi
 
-# Set environment for installer - ensure all tools are available
-export PATH="/usr/local/bin:$PATH"
+# # Set environment for installer - ensure all tools are available
+# export PATH="/usr/local/bin:$PATH"
 
-# Verify prerequisites are available
-msg_info "Verifying prerequisites for KamiWaza installer"
-echo "Python version: $(python --version)"
-echo "Python path: $(which python)"
-echo "Pip version: $(pip --version)"
-echo "Node version: $(node --version)"
-echo "Docker version: $(docker --version)"
-echo "CockroachDB version: $(cockroach version --build-tag 2>/dev/null || echo 'Not found in PATH')"
-python -c "import cryptography; print(f'Cryptography version: {cryptography.__version__}')" || echo "Cryptography import failed"
-msg_ok "Prerequisites verified"
+# # Verify prerequisites are available
+# msg_info "Verifying prerequisites for KamiWaza installer"
+# echo "Python version: $(python --version)"
+# echo "Python path: $(which python)"
+# echo "Pip version: $(pip --version)"
+# echo "Node version: $(node --version)"
+# echo "Docker version: $(docker --version)"
+# echo "CockroachDB version: $(cockroach version --build-tag 2>/dev/null || echo 'Not found in PATH')"
+# python -c "import cryptography; print(f'Cryptography version: {cryptography.__version__}')" || echo "Cryptography import failed"
+# msg_ok "Prerequisites verified"
 
-# Run installer as root with proper PATH
-msg_info "Executing KamiWaza installer"
-# Automatically accept EULA and continue installation
-echo -e "\nyes" | bash install.sh --community
-msg_ok "KamiWaza Installation Completed"
+# # Run installer as root with proper PATH
+# msg_info "Executing KamiWaza installer"
+# # Automatically accept EULA and continue installation
+# echo -e "\nyes" | bash install.sh --community
+# msg_ok "KamiWaza Installation Completed"
 
-msg_info "Creating KamiWaza user and setting permissions"
-# Create a dedicated service user for KamiWaza (nologin for security)
-useradd -r -m -s /usr/sbin/nologin kamiwaza || true
-usermod -aG docker kamiwaza
+# msg_info "Creating KamiWaza user and setting permissions"
+# # Create a dedicated service user for KamiWaza (nologin for security)
+# useradd -r -m -s /usr/sbin/nologin kamiwaza || true
+# usermod -aG docker kamiwaza
 
-# Set ownership of KamiWaza directory to kamiwaza user
-chown -R kamiwaza:kamiwaza /opt/kamiwaza
-# Also set ownership of the Python virtual environment
-chown -R kamiwaza:kamiwaza /opt/kamiwaza-python
-msg_ok "Created KamiWaza user and set permissions"
+# # Set ownership of KamiWaza directory to kamiwaza user
+# chown -R kamiwaza:kamiwaza /opt/kamiwaza
+# # Also set ownership of the Python virtual environment
+# chown -R kamiwaza:kamiwaza /opt/kamiwaza-python
+# msg_ok "Created KamiWaza user and set permissions"
 
-msg_info "Creating systemd service"
-cat <<EOF >/etc/systemd/system/kamiwaza.service
-[Unit]
-Description=KamiWaza AI Platform
-Documentation=https://docs.kamiwaza.ai/
-After=network.target docker.service
-Wants=docker.service
+# msg_info "Creating systemd service"
+# cat <<EOF >/etc/systemd/system/kamiwaza.service
+# [Unit]
+# Description=KamiWaza AI Platform
+# Documentation=https://docs.kamiwaza.ai/
+# After=network.target docker.service
+# Wants=docker.service
 
-[Service]
-Type=forking
-User=kamiwaza
-Group=kamiwaza
-WorkingDirectory=/opt/kamiwaza
-Environment=PATH=/opt/kamiwaza-python/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/bin/bash -c 'source /opt/kamiwaza-python/bin/activate && /opt/kamiwaza/startup/kamiwazad.sh start'
-ExecStop=/bin/bash -c 'source /opt/kamiwaza-python/bin/activate && /opt/kamiwaza/startup/kamiwazad.sh stop'
-ExecReload=/bin/bash -c 'source /opt/kamiwaza-python/bin/activate && /opt/kamiwaza/startup/kamiwazad.sh restart'
-Restart=on-failure
-RestartSec=5
-TimeoutStartSec=300
-TimeoutStopSec=30
+# [Service]
+# Type=forking
+# User=kamiwaza
+# Group=kamiwaza
+# WorkingDirectory=/opt/kamiwaza
+# Environment=PATH=/opt/kamiwaza-python/bin:/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin
+# Environment=VIRTUAL_ENV=/opt/kamiwaza-python
+# ExecStart=/bin/bash -c 'source /opt/kamiwaza-python/bin/activate && /opt/kamiwaza/startup/kamiwazad.sh start'
+# ExecStop=/bin/bash -c 'source /opt/kamiwaza-python/bin/activate && /opt/kamiwaza/startup/kamiwazad.sh stop'
+# ExecReload=/bin/bash -c 'source /opt/kamiwaza-python/bin/activate && /opt/kamiwaza/startup/kamiwazad.sh restart'
+# Restart=on-failure
+# RestartSec=5
+# TimeoutStartSec=300
+# TimeoutStopSec=30
 
-[Install]
-WantedBy=multi-user.target
-EOF
+# [Install]
+# WantedBy=multi-user.target
+# EOF
 
-systemctl daemon-reload
-systemctl enable kamiwaza
-systemctl start kamiwaza
-msg_ok "Created and started systemd service"
+# systemctl daemon-reload
+# systemctl enable kamiwaza
+# systemctl start kamiwaza
+# msg_ok "Created and started systemd service"
 
-msg_info "Checking GPU Support"
-if command -v nvidia-smi &> /dev/null; then
-  GPU_INFO=$(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader,nounits 2>/dev/null | head -1)
-  if [[ -n "$GPU_INFO" ]]; then
-    msg_info "NVIDIA GPU detected: $GPU_INFO"
-    COMPUTE_CAP=$(echo "$GPU_INFO" | cut -d',' -f2 | tr -d ' ')
-    if (( $(echo "$COMPUTE_CAP >= 7.0" | bc -l 2>/dev/null || echo "0") )); then
-      msg_ok "GPU meets KamiWaza requirements (Compute Capability 7.0+)"
-    else
-      msg_info "GPU Compute Capability $COMPUTE_CAP may not meet requirements (7.0+ recommended)"
-    fi
-  fi
-else
-  msg_info "No NVIDIA GPU detected - CPU-only mode"
-  msg_info "For GPU support, install NVIDIA drivers and nvidia-container-toolkit"
-fi
+# msg_info "Checking GPU Support"
+# if command -v nvidia-smi &> /dev/null; then
+#   GPU_INFO=$(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader,nounits 2>/dev/null | head -1)
+#   if [[ -n "$GPU_INFO" ]]; then
+#     msg_info "NVIDIA GPU detected: $GPU_INFO"
+#     COMPUTE_CAP=$(echo "$GPU_INFO" | cut -d',' -f2 | tr -d ' ')
+#     if (( $(echo "$COMPUTE_CAP >= 7.0" | bc -l 2>/dev/null || echo "0") )); then
+#       msg_ok "GPU meets KamiWaza requirements (Compute Capability 7.0+)"
+#     else
+#       msg_info "GPU Compute Capability $COMPUTE_CAP may not meet requirements (7.0+ recommended)"
+#     fi
+#   fi
+# else
+#   msg_info "No NVIDIA GPU detected - CPU-only mode"
+#   msg_info "For GPU support, install NVIDIA drivers and nvidia-container-toolkit"
+# fi
 
-msg_info "Saving Access Information"
-{
-  echo "KamiWaza CE Access Information"
-  echo "============================="
-  echo "Web Console: https://$(hostname -I | awk '{print $1}')"
-  echo "Default Username: admin"
-  echo "Default Password: kamiwaza"
-  echo ""
-  echo "System Requirements Met:"
-  echo "- OS: Ubuntu ${UBUNTU_VERSION} LTS"
-  echo "- Memory: ${TOTAL_MEM}MB (16GB+ required)"
-  echo "- Python: 3.10 (virtual environment)"
-  echo "- Docker: Engine with Compose v2"
-  echo "- Node.js: 22 (via NVM)"
-  echo ""
-  if command -v nvidia-smi &> /dev/null; then
-    echo "GPU Support: $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo 'Not available')"
-  else
-    echo "GPU Support: Not configured (CPU-only mode)"
-    echo "For GPU acceleration: Install NVIDIA drivers >= 450.80.02"
-  fi
-  echo ""
-  echo "Service Management:"
-  echo "Start:   systemctl start kamiwaza"
-  echo "Stop:    systemctl stop kamiwaza"
-  echo "Restart: systemctl restart kamiwaza"
-  echo "Status:  systemctl status kamiwaza"
-  echo ""
-  echo "Installation Directory: /opt/kamiwaza"
-  echo "Python Environment: /opt/kamiwaza-python"
-  echo "Version: ${KAMIWAZA_VERSION}"
-  echo ""
-  echo "Network Ports:"
-  echo "- 443/tcp: HTTPS primary access"
-  echo "- 51100-51199/tcp: Model deployment ports (if needed)"
-} >> ~/kamiwaza.info
-msg_ok "Saved Access Information"
+# msg_info "Saving Access Information"
+# {
+#   echo "KamiWaza CE Access Information"
+#   echo "============================="
+#   echo "Web Console: https://$(hostname -I | awk '{print $1}')"
+#   echo "Default Username: admin"
+#   echo "Default Password: kamiwaza"
+#   echo ""
+#   echo "System Requirements Met:"
+#   echo "- OS: Ubuntu ${UBUNTU_VERSION} LTS"
+#   echo "- Memory: ${TOTAL_MEM}MB (16GB+ required)"
+#   echo "- Python: 3.10 (virtual environment)"
+#   echo "- Docker: Engine with Compose v2"
+#   echo "- Node.js: 22 (via NVM)"
+#   echo ""
+#   if command -v nvidia-smi &> /dev/null; then
+#     echo "GPU Support: $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo 'Not available')"
+#   else
+#     echo "GPU Support: Not configured (CPU-only mode)"
+#     echo "For GPU acceleration: Install NVIDIA drivers >= 450.80.02"
+#   fi
+#   echo ""
+#   echo "Service Management:"
+#   echo "Start:   systemctl start kamiwaza"
+#   echo "Stop:    systemctl stop kamiwaza"
+#   echo "Restart: systemctl restart kamiwaza"
+#   echo "Status:  systemctl status kamiwaza"
+#   echo ""
+#   echo "Installation Directory: /opt/kamiwaza"
+#   echo "Python Environment: /opt/kamiwaza-python"
+#   echo "Version: ${KAMIWAZA_VERSION}"
+#   echo ""
+#   echo "Network Ports:"
+#   echo "- 443/tcp: HTTPS primary access"
+#   echo "- 51100-51199/tcp: Model deployment ports (if needed)"
+# } >> ~/kamiwaza.info
+# msg_ok "Saved Access Information"
 
-motd_ssh
-customize
+# motd_ssh
+# customize
 
-msg_info "Cleaning up"
-cd /opt/kamiwaza || exit
-rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
-msg_ok "Cleaned"
+# msg_info "Cleaning up"
+# cd /opt/kamiwaza || exit
+# rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
+# $STD apt-get -y autoremove
+# $STD apt-get -y autoclean
+# msg_ok "Cleaned"
