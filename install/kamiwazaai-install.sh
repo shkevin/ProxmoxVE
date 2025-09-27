@@ -38,22 +38,28 @@ $STD apt-get install -y \
   jq
 msg_ok "Installed Core System Dependencies"
 
-# Install Python 3.10 using the helper function
-msg_info "Installing Python 3.10 via uv"
-export PYTHON_VERSION="3.10"
-setup_uv
+# Install Python 3.10 system-wide for KamiWaza compatibility
+msg_info "Installing Python 3.10 system-wide"
+# Add deadsnakes PPA for Python 3.10 on Ubuntu 24.04
+$STD add-apt-repository -y ppa:deadsnakes/ppa
+$STD apt-get update
+$STD apt-get install -y \
+  python3.10 \
+  python3.10-dev \
+  python3.10-venv \
+  python3.10-distutils \
+  python3-pip \
+  python3-venv
 
-# Ensure Python 3.10 is available as 'python' and install pip
-msg_info "Configuring Python and pip"
-# Make Python 3.10 available as 'python'
-PYTHON_310_PATH=$(uv python find 3.10)
-ln -sf "$PYTHON_310_PATH" /usr/local/bin/python
-ln -sf "$PYTHON_310_PATH" /usr/local/bin/python3
-# Install pip for Python 3.10
-$STD apt-get install -y python3-pip python3-venv
+# Make Python 3.10 available as default 'python' and 'python3'
+update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
+ln -sf /usr/bin/python3.10 /usr/local/bin/python
+ln -sf /usr/bin/python3.10 /usr/local/bin/python3
+ln -sf /usr/bin/python3.10 /usr/local/bin/python3.10
 # Create pip symlink
 ln -sf /usr/bin/pip3 /usr/local/bin/pip
-msg_ok "Configured Python and pip"
+msg_ok "Installed Python 3.10 system-wide"
 
 msg_info "Installing Graphics & Development Libraries"
 $STD apt-get install -y \
@@ -113,6 +119,9 @@ useradd -r -m -s /bin/bash kamiwaza || true
 usermod -aG docker kamiwaza
 # Set ownership of KamiWaza directory
 chown -R kamiwaza:kamiwaza /opt/kamiwaza
+# Ensure kamiwaza user has proper PATH and environment
+echo 'export PATH="/usr/local/bin:$PATH"' >> /home/kamiwaza/.bashrc
+echo 'export PYTHON=/usr/bin/python3.10' >> /home/kamiwaza/.bashrc
 msg_ok "Created KamiWaza user"
 
 msg_info "Running KamiWaza Installer"
@@ -129,8 +138,8 @@ msg_ok "Prerequisites verified"
 
 # Run installer without silencing output to debug issues
 msg_info "Executing KamiWaza installer as kamiwaza user"
-# Automatically accept EULA and continue installation
-echo -e "\nyes" | sudo -u kamiwaza bash install.sh --community
+# Automatically accept EULA and continue installation with proper environment
+echo -e "\nyes" | sudo -u kamiwaza -H env PATH="/usr/local/bin:$PATH" PYTHON=/usr/bin/python3.10 bash install.sh --community
 msg_ok "KamiWaza Installation Completed"
 
 msg_info "Creating systemd service"
