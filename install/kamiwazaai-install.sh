@@ -46,10 +46,20 @@ msg_ok "Installed Python 3.10 via uv"
 
 # Configure Python for KamiWaza compatibility
 msg_info "Configuring Python and pip for KamiWaza"
-# Get Python 3.10 path from uv and create alternatives
+# Get Python 3.10 path from uv and create symlinks/alternatives
 PYTHON_310_PATH=$(uv python find 3.10)
-update-alternatives --install /usr/local/bin/python python "$PYTHON_310_PATH" 1
-update-alternatives --install /usr/local/bin/python3.10 python3.10 "$PYTHON_310_PATH" 1
+echo "Debug: Python 3.10 path detected as: $PYTHON_310_PATH"
+if [[ -z "$PYTHON_310_PATH" || ! -f "$PYTHON_310_PATH" ]]; then
+  msg_error "Failed to find Python 3.10 installation"
+  echo "Debug: uv python list output:"
+  uv python list
+  exit 1
+fi
+# Create all the Python symlinks that KamiWaza might need
+ln -sf "$PYTHON_310_PATH" /usr/local/bin/python
+ln -sf "$PYTHON_310_PATH" /usr/local/bin/python3.10
+# Also create a system-wide alternative for python3.10 command
+update-alternatives --install /usr/bin/python3.10 python3.10 "$PYTHON_310_PATH" 1
 # Install pip and create symlink
 $STD apt-get install -y python3-pip python3-venv
 ln -sf /usr/bin/pip3 /usr/local/bin/pip
@@ -125,6 +135,7 @@ export PATH="/usr/local/bin:$PATH"
 msg_info "Verifying prerequisites for KamiWaza installer"
 echo "Python version: $(python --version)"
 echo "Python3 version: $(python3 --version)"
+echo "Python3.10 version: $(python3.10 --version)"
 echo "Pip version: $(pip --version)"
 echo "Node version: $(node --version)"
 echo "Docker version: $(docker --version)"
