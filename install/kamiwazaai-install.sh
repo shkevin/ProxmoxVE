@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Copyright (c) 2021-2025 community-scripts ORG
-# Author: Kevin Cox
+# Author: shkevin
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://github.com/kamiwaza-ai/kamiwaza-community-edition
 
@@ -82,27 +82,57 @@ cp cockroach-v23.2.12.linux-amd64/cockroach /usr/local/bin/
 rm -rf cockroach-v23.2.12.linux-amd64
 msg_ok "Installed CockroachDB"
 
-msg_info "Installing KamiWaza CE via APT Package"
-# Add Kamiwaza repository to APT sources
-echo "deb [signed-by=/usr/share/keyrings/kamiwaza-archive-keyring.gpg] https://packages.kamiwaza.ai/ubuntu/ noble main" | tee /etc/apt/sources.list.d/kamiwaza.list > /dev/null
+msg_info "Installing KamiWaza CE via Tarball"
+# Get the latest version from available tarballs in the repository
+KAMIWAZA_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/contents/ | jq -r '.[] | select(.name | test("kamiwaza-community-.*-UbuntuLinux.tar.gz")) | .name' | sed 's/kamiwaza-community-\(.*\)-UbuntuLinux.tar.gz/\1/' | sort -V | tail -1)
+if [[ -z "$KAMIWAZA_VERSION" ]]; then
+  # Fallback to known version if API fails
+  KAMIWAZA_VERSION="0.5.0"
+fi
 
-# Import and install Kamiwaza GPG signing key
-curl -fsSL https://packages.kamiwaza.ai/gpg | gpg --dearmor -o /usr/share/keyrings/kamiwaza-archive-keyring.gpg
-
-# Update package database and install Kamiwaza
-$STD apt-get update
-$STD apt-get upgrade -y
-$STD apt-get install -y kamiwaza
-
-# Get the installed version for tracking
-KAMIWAZA_VERSION=$(dpkg -l | grep kamiwaza | awk '{print $3}' | head -1)
+mkdir -p /opt/kamiwaza && cd /opt/kamiwaza || exit
+wget -q "https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
+tar -xf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz" &>/dev/null
 echo "${KAMIWAZA_VERSION}" > "/opt/KamiWazaAI_version.txt"
-msg_ok "Installed KamiWaza CE v${KAMIWAZA_VERSION}"
+msg_ok "Downloaded KamiWaza CE v${KAMIWAZA_VERSION}"
 
-msg_info "Starting KamiWaza Service"
-$STD systemctl enable kamiwaza
-$STD systemctl start kamiwaza
-msg_ok "KamiWaza Service Started"
+msg_info "Running KamiWaza Installer"
+# Set environment for installer
+export PATH="/usr/local/bin:$PATH"
+$STD bash install.sh --community
+msg_ok "KamiWaza Installation Completed"
+
+msg_info "Starting KamiWaza Services"
+$STD bash startup/kamiwazad.sh start
+msg_ok "KamiWaza Services Started"
+
+msg_info "Creating Service Management Script"
+cat <<EOF >/usr/local/bin/kamiwaza-service
+#!/bin/bash
+cd /opt/kamiwaza
+case "\$1" in
+  start)
+    bash startup/kamiwazad.sh start
+    ;;
+  stop)
+    bash startup/kamiwazad.sh stop
+    ;;
+  restart)
+    bash startup/kamiwazad.sh stop
+    sleep 5
+    bash startup/kamiwazad.sh start
+    ;;
+  status)
+    bash startup/kamiwazad.sh status 2>/dev/null || echo "KamiWaza is not running"
+    ;;
+  *)
+    echo "Usage: \$0 {start|stop|restart|status}"
+    exit 1
+    ;;
+esac
+EOF
+chmod +x /usr/local/bin/kamiwaza-service
+msg_ok "Created Service Management Script"
 
 
 msg_info "Checking GPU Support"
@@ -145,10 +175,10 @@ msg_info "Saving Access Information"
   fi
   echo ""
   echo "Service Management:"
-  echo "Start:   systemctl start kamiwaza"
-  echo "Stop:    systemctl stop kamiwaza"
-  echo "Restart: systemctl restart kamiwaza"
-  echo "Status:  systemctl status kamiwaza"
+  echo "Start:   kamiwaza-service start"
+  echo "Stop:    kamiwaza-service stop"
+  echo "Restart: kamiwaza-service restart"
+  echo "Status:  kamiwaza-service status"
   echo ""
   echo "Installation Directory: /opt/kamiwaza"
   echo "Version: ${KAMIWAZA_VERSION}"
@@ -163,6 +193,8 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
+cd /opt/kamiwaza || exit
+rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 $STD apt-get -y autoremove
 $STD apt-get -y autoclean
 msg_ok "Cleaned"
