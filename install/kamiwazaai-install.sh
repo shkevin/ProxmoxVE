@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-
 # Copyright (c) 2021-2025 community-scripts ORG
 # Author: shkevin
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://github.com/kamiwaza-ai/kamiwaza-community-edition
-
 source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
 color
 verb_ip6
@@ -39,24 +37,39 @@ $STD apt-get install -y \
 msg_ok "Installed Core System Dependencies"
 
 # Install Python 3.10 (required for KamiWaza CE)
-msg_info "Installing Python 3.10"
+msg_info "Installing Python 3.10 and dependencies"
 $STD apt-get update
 $STD apt-get install -y software-properties-common
 $STD add-apt-repository -y ppa:deadsnakes/ppa
 $STD apt-get update && $STD apt-get upgrade -y
-$STD apt-get install -y python3.10
-# Create python symlink as specified in official docs
-ln -sf /usr/bin/python3.10 /usr/local/bin/python
-msg_ok "Installed Python 3.10"
+$STD apt-get install -y \
+  python3.10 \
+  python3.10-dev \
+  python3.10-distutils \
+  python3.10-venv \
+  libpython3.10-dev \
+  libffi-dev \
+  libssl-dev \
+  build-essential \
+  pkg-config
+
+# Create a system-wide virtual environment for KamiWaza
+python3.10 -m venv /opt/kamiwaza-python
+source /opt/kamiwaza-python/bin/activate
+
+# Install pip and dependencies in the virtual environment
+pip install --upgrade pip setuptools wheel cffi cryptography
+
+# Create symlinks to make the venv python available system-wide
+ln -sf /opt/kamiwaza-python/bin/python /usr/local/bin/python
+ln -sf /opt/kamiwaza-python/bin/pip /usr/local/bin/pip
+
+msg_ok "Installed Python 3.10 in virtual environment"
 
 # Install system update and core packages
 msg_info "Installing core packages"
 $STD apt-get update && $STD apt-get upgrade -y
 $STD apt-get install -y \
-  python3.10 \
-  python3.10-dev \
-  libpython3.10-dev \
-  python3.10-venv \
   golang-cfssl \
   python-is-python3 \
   etcd-client \
@@ -85,8 +98,6 @@ fi
 export PATH="/usr/local/bin:$PATH"
 msg_ok "Installed core packages"
 
-# Note: Graphics libraries and system tools already installed in core packages step
-
 msg_info "Installing Node.js 22"
 export NODE_VERSION="22"
 setup_nodejs
@@ -95,14 +106,17 @@ msg_ok "Installed Node.js 22"
 msg_info "Installing Docker Engine + Compose v2"
 # Add Docker's official GPG key
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg &>/dev/null
+
 # Set up the Docker repository
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 $STD apt-get update
 $STD apt-get install -y docker-ce docker-ce-cli containerd.io
+
 # Install Docker Compose v2
 mkdir -p /usr/local/lib/docker/cli-plugins
 curl -SL "https://github.com/docker/compose/releases/download/v2.39.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose &>/dev/null
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
 # Add root to docker group (container runs as root)
 usermod -aG docker root
 msg_ok "Installed Docker Engine + Compose v2"
@@ -111,7 +125,7 @@ msg_info "Installing CockroachDB"
 # Install CockroachDB as per official KamiWaza guide
 wget -qO- https://binaries.cockroachdb.com/cockroach-v23.2.12.linux-amd64.tgz | tar xvz &>/dev/null
 cp cockroach-v23.2.12.linux-amd64/cockroach /usr/local/bin/
-chmod +x /usr/local/bin/cockroach  # ADD THIS LINE
+chmod +x /usr/local/bin/cockroach
 rm -rf cockroach-v23.2.12.linux-amd64
 msg_ok "Installed CockroachDB"
 
@@ -122,7 +136,6 @@ if [[ -z "$KAMIWAZA_VERSION" ]]; then
   # Fallback to known version if API fails
   KAMIWAZA_VERSION="0.5.0"
 fi
-
 mkdir -p /opt/kamiwaza && cd /opt/kamiwaza || exit
 wget -q "https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 tar -xf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz" &>/dev/null
@@ -130,30 +143,40 @@ echo "${KAMIWAZA_VERSION}" > "/opt/KamiWazaAI_version.txt"
 msg_ok "Downloaded KamiWaza CE v${KAMIWAZA_VERSION}"
 
 msg_info "Running KamiWaza Installer"
+# Ensure we're using the correct Python environment
+if [ -f /opt/kamiwaza-python/bin/activate ]; then
+    source /opt/kamiwaza-python/bin/activate
+fi
+
 # Set environment for installer - ensure all tools are available
 export PATH="/usr/local/bin:$PATH"
 
 # Verify prerequisites are available
 msg_info "Verifying prerequisites for KamiWaza installer"
 echo "Python version: $(python --version)"
-echo "Python3.10 version: $(python3.10 --version)"
+echo "Python path: $(which python)"
+echo "Pip version: $(pip --version)"
 echo "Node version: $(node --version)"
 echo "Docker version: $(docker --version)"
 echo "CockroachDB version: $(cockroach version --build-tag 2>/dev/null || echo 'Not found in PATH')"
+python -c "import cryptography; print(f'Cryptography version: {cryptography.__version__}')" || echo "Cryptography import failed"
 msg_ok "Prerequisites verified"
 
 # Run installer as root with proper PATH
 msg_info "Executing KamiWaza installer"
 # Automatically accept EULA and continue installation
-echo -e "\nyes" | env PATH="/usr/local/bin:$PATH" bash install.sh --community
+echo -e "\nyes" | bash install.sh --community
 msg_ok "KamiWaza Installation Completed"
 
 msg_info "Creating KamiWaza user and setting permissions"
 # Create a dedicated service user for KamiWaza (nologin for security)
 useradd -r -m -s /usr/sbin/nologin kamiwaza || true
 usermod -aG docker kamiwaza
+
 # Set ownership of KamiWaza directory to kamiwaza user
 chown -R kamiwaza:kamiwaza /opt/kamiwaza
+# Also set ownership of the Python virtual environment
+chown -R kamiwaza:kamiwaza /opt/kamiwaza-python
 msg_ok "Created KamiWaza user and set permissions"
 
 msg_info "Creating systemd service"
@@ -169,9 +192,10 @@ Type=forking
 User=kamiwaza
 Group=kamiwaza
 WorkingDirectory=/opt/kamiwaza
-ExecStart=/opt/kamiwaza/startup/kamiwazad.sh start
-ExecStop=/opt/kamiwaza/startup/kamiwazad.sh stop
-ExecReload=/opt/kamiwaza/startup/kamiwazad.sh restart
+Environment=PATH=/opt/kamiwaza-python/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash -c 'source /opt/kamiwaza-python/bin/activate && /opt/kamiwaza/startup/kamiwazad.sh start'
+ExecStop=/bin/bash -c 'source /opt/kamiwaza-python/bin/activate && /opt/kamiwaza/startup/kamiwazad.sh stop'
+ExecReload=/bin/bash -c 'source /opt/kamiwaza-python/bin/activate && /opt/kamiwaza/startup/kamiwazad.sh restart'
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=300
@@ -214,7 +238,7 @@ msg_info "Saving Access Information"
   echo "System Requirements Met:"
   echo "- OS: Ubuntu ${UBUNTU_VERSION} LTS"
   echo "- Memory: ${TOTAL_MEM}MB (16GB+ required)"
-  echo "- Python: (tarball installation)"
+  echo "- Python: 3.10 (virtual environment)"
   echo "- Docker: Engine with Compose v2"
   echo "- Node.js: 22 (via NVM)"
   echo ""
@@ -232,6 +256,7 @@ msg_info "Saving Access Information"
   echo "Status:  systemctl status kamiwaza"
   echo ""
   echo "Installation Directory: /opt/kamiwaza"
+  echo "Python Environment: /opt/kamiwaza-python"
   echo "Version: ${KAMIWAZA_VERSION}"
   echo ""
   echo "Network Ports:"
