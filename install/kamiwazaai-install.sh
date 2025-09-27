@@ -38,28 +38,18 @@ $STD apt-get install -y \
   jq
 msg_ok "Installed Core System Dependencies"
 
-# Install Python 3.10 using deadsnakes PPA (for system-wide availability)
-msg_info "Installing Python 3.10"
-$STD apt-get install -y software-properties-common
-$STD add-apt-repository -y ppa:deadsnakes/ppa
-$STD apt-get update
-$STD apt-get install -y python3.10 python3.10-venv python3.10-dev python3.10-distutils
-msg_ok "Installed Python 3.10"
-
-# Configure Python for KamiWaza compatibility
-msg_info "Configuring Python and pip for KamiWaza"
-# Clean up any old Python installations
-rm -f /usr/local/bin/python /usr/local/bin/python3.10 /usr/local/bin/pip
-update-alternatives --remove-all python >/dev/null 2>&1 || true
-# Create simple symlinks instead of alternatives for better reliability
-ln -sf /usr/bin/python3.10 /usr/local/bin/python
-ln -sf /usr/bin/python3.10 /usr/local/bin/python3.10
-# Install pip and create symlink
-$STD apt-get install -y python3-pip python3-venv
-ln -sf /usr/bin/pip3 /usr/local/bin/pip
+# Configure Python for KamiWaza (using system Python 3.12)
+msg_info "Configuring Python for KamiWaza"
+# Install Python development packages and pip
+$STD apt-get install -y python3-pip python3-venv python3-dev
+# Create python symlink for scripts that expect it
+ln -sf /usr/bin/python3 /usr/local/bin/python
+# Ensure /usr/local/bin is in PATH permanently
+echo 'export PATH="/usr/local/bin:$PATH"' > /etc/profile.d/usr-local-bin.sh
+chmod +x /etc/profile.d/usr-local-bin.sh
 # Ensure /usr/local/bin is in PATH for current session
 export PATH="/usr/local/bin:$PATH"
-msg_ok "Configured Python and pip for KamiWaza"
+msg_ok "Configured Python for KamiWaza"
 
 msg_info "Installing Graphics & Development Libraries"
 $STD apt-get install -y \
@@ -116,21 +106,21 @@ msg_ok "Downloaded KamiWaza CE v${KAMIWAZA_VERSION}"
 msg_info "Running KamiWaza Installer"
 # Set environment for installer - ensure all tools are available
 export PATH="/usr/local/bin:$PATH"
-export PYTHON=/usr/bin/python3.10
 
 # Verify prerequisites are available
 msg_info "Verifying prerequisites for KamiWaza installer"
 echo "Python version: $(python --version)"
-echo "Python3.10 version: $(python3.10 --version)"
-echo "Pip version: $(pip --version)"
+echo "Python3 version: $(python3 --version)"
+echo "Pip version: $(pip3 --version)"
 echo "Node version: $(node --version)"
 echo "Docker version: $(docker --version)"
+echo "CockroachDB version: $(cockroach version --build-tag 2>/dev/null || echo 'Not found in PATH')"
 msg_ok "Prerequisites verified"
 
-# Run installer as root (much simpler and more reliable)
+# Run installer as root with proper PATH
 msg_info "Executing KamiWaza installer"
 # Automatically accept EULA and continue installation
-echo -e "\nyes" | bash install.sh --community
+echo -e "\nyes" | env PATH="/usr/local/bin:$PATH" bash install.sh --community
 msg_ok "KamiWaza Installation Completed"
 
 msg_info "Creating KamiWaza user and setting permissions"
@@ -170,7 +160,6 @@ systemctl daemon-reload
 systemctl enable kamiwaza
 systemctl start kamiwaza
 msg_ok "Created and started systemd service"
-
 
 msg_info "Checking GPU Support"
 if command -v nvidia-smi &> /dev/null; then
