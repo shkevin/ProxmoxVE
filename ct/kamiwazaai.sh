@@ -32,8 +32,12 @@ function update_script() {
     exit
   fi
 
-  # Check for latest version from GitHub releases
-  LATEST_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3)}')
+  # Check for latest version from available tarballs
+  LATEST_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/contents/ | jq -r '.[] | select(.name | test("kamiwaza-community-.*-UbuntuLinux.tar.gz")) | .name' | sed 's/kamiwaza-community-\(.*\)-UbuntuLinux.tar.gz/\1/' | sort -V | tail -1)
+  if [[ -z "$LATEST_VERSION" ]]; then
+    # Fallback to known version if API fails
+    LATEST_VERSION="0.5.0"
+  fi
   CURRENT_VERSION=$(cat /opt/KamiWazaAI_version.txt 2>/dev/null || echo "0.0.0")
 
   if [[ "${LATEST_VERSION}" != "${CURRENT_VERSION}" ]]; then

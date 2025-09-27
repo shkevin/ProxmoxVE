@@ -109,8 +109,12 @@ rm -rf cockroach-v23.2.12.linux-amd64
 msg_ok "Installed CockroachDB"
 
 msg_info "Downloading and Installing KamiWaza CE"
-# Get the latest version
-KAMIWAZA_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3)}')
+# Get the latest version from available tarballs in the repository
+KAMIWAZA_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/contents/ | jq -r '.[] | select(.name | test("kamiwaza-community-.*-UbuntuLinux.tar.gz")) | .name' | sed 's/kamiwaza-community-\(.*\)-UbuntuLinux.tar.gz/\1/' | sort -V | tail -1)
+if [[ -z "$KAMIWAZA_VERSION" ]]; then
+  # Fallback to known version if API fails
+  KAMIWAZA_VERSION="0.5.0"
+fi
 mkdir -p /opt/kamiwaza && cd /opt/kamiwaza || exit
 wget -q "https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 tar -xf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz" &>/dev/null
