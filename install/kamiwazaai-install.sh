@@ -38,31 +38,27 @@ $STD apt-get install -y \
   jq
 msg_ok "Installed Core System Dependencies"
 
-# Install Python 3.10 using the helper function
-msg_info "Installing Python 3.10 via uv"
-export PYTHON_VERSION="3.10"
-setup_uv
-msg_ok "Installed Python 3.10 via uv"
+# Install Python 3.10 using deadsnakes PPA (for system-wide availability)
+msg_info "Installing Python 3.10"
+$STD apt-get install -y software-properties-common
+$STD add-apt-repository -y ppa:deadsnakes/ppa
+$STD apt-get update
+$STD apt-get install -y python3.10 python3.10-venv python3.10-dev python3.10-distutils
+msg_ok "Installed Python 3.10"
 
 # Configure Python for KamiWaza compatibility
 msg_info "Configuring Python and pip for KamiWaza"
-# Get Python 3.10 path from uv and create symlinks/alternatives
-PYTHON_310_PATH=$(uv python find 3.10)
-echo "Debug: Python 3.10 path detected as: $PYTHON_310_PATH"
-if [[ -z "$PYTHON_310_PATH" || ! -f "$PYTHON_310_PATH" ]]; then
-  msg_error "Failed to find Python 3.10 installation"
-  echo "Debug: uv python list output:"
-  uv python list
-  exit 1
-fi
-# Create all the Python symlinks that KamiWaza might need
-ln -sf "$PYTHON_310_PATH" /usr/local/bin/python
-ln -sf "$PYTHON_310_PATH" /usr/local/bin/python3.10
-# Also create a system-wide alternative for python3.10 command
-update-alternatives --install /usr/bin/python3.10 python3.10 "$PYTHON_310_PATH" 1
+# Clean up any old Python installations
+rm -f /usr/local/bin/python /usr/local/bin/python3.10 /usr/local/bin/pip
+update-alternatives --remove-all python >/dev/null 2>&1 || true
+# Create simple symlinks instead of alternatives for better reliability
+ln -sf /usr/bin/python3.10 /usr/local/bin/python
+ln -sf /usr/bin/python3.10 /usr/local/bin/python3.10
 # Install pip and create symlink
 $STD apt-get install -y python3-pip python3-venv
 ln -sf /usr/bin/pip3 /usr/local/bin/pip
+# Ensure /usr/local/bin is in PATH for current session
+export PATH="/usr/local/bin:$PATH"
 msg_ok "Configured Python and pip for KamiWaza"
 
 msg_info "Installing Graphics & Development Libraries"
@@ -134,7 +130,6 @@ export PATH="/usr/local/bin:$PATH"
 # Verify prerequisites are available
 msg_info "Verifying prerequisites for KamiWaza installer"
 echo "Python version: $(python --version)"
-echo "Python3 version: $(python3 --version)"
 echo "Python3.10 version: $(python3.10 --version)"
 echo "Pip version: $(pip --version)"
 echo "Node version: $(node --version)"
