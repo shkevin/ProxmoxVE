@@ -113,20 +113,11 @@ tar -xf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz" &>/dev/null
 echo "${KAMIWAZA_VERSION}" > "/opt/KamiWazaAI_version.txt"
 msg_ok "Downloaded KamiWaza CE v${KAMIWAZA_VERSION}"
 
-msg_info "Creating KamiWaza user"
-# Create a dedicated user for KamiWaza (since it won't run as root)
-useradd -r -m -s /bin/bash kamiwaza || true
-usermod -aG docker kamiwaza
-# Set ownership of KamiWaza directory
-chown -R kamiwaza:kamiwaza /opt/kamiwaza
-# Ensure kamiwaza user has proper PATH and environment
-echo 'export PATH="/usr/local/bin:$PATH"' >> /home/kamiwaza/.bashrc
-echo 'export PYTHON=/usr/bin/python3.10' >> /home/kamiwaza/.bashrc
-msg_ok "Created KamiWaza user"
-
 msg_info "Running KamiWaza Installer"
 # Set environment for installer - ensure all tools are available
 export PATH="/usr/local/bin:$PATH"
+export PYTHON=/usr/bin/python3.10
+
 # Verify prerequisites are available
 msg_info "Verifying prerequisites for KamiWaza installer"
 echo "Python version: $(python --version)"
@@ -136,11 +127,19 @@ echo "Node version: $(node --version)"
 echo "Docker version: $(docker --version)"
 msg_ok "Prerequisites verified"
 
-# Run installer without silencing output to debug issues
-msg_info "Executing KamiWaza installer as kamiwaza user"
-# Automatically accept EULA and continue installation with proper environment
-echo -e "\nyes" | sudo -u kamiwaza -H env PATH="/usr/local/bin:$PATH" PYTHON=/usr/bin/python3.10 bash install.sh --community
+# Run installer as root (much simpler and more reliable)
+msg_info "Executing KamiWaza installer"
+# Automatically accept EULA and continue installation
+echo -e "\nyes" | bash install.sh --community
 msg_ok "KamiWaza Installation Completed"
+
+msg_info "Creating KamiWaza user and setting permissions"
+# Create a dedicated service user for KamiWaza (nologin for security)
+useradd -r -m -s /usr/sbin/nologin kamiwaza || true
+usermod -aG docker kamiwaza
+# Set ownership of KamiWaza directory to kamiwaza user
+chown -R kamiwaza:kamiwaza /opt/kamiwaza
+msg_ok "Created KamiWaza user and set permissions"
 
 msg_info "Creating systemd service"
 cat <<EOF >/etc/systemd/system/kamiwaza.service
