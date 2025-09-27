@@ -38,28 +38,22 @@ $STD apt-get install -y \
   jq
 msg_ok "Installed Core System Dependencies"
 
-# Install Python 3.10 system-wide for KamiWaza compatibility
-msg_info "Installing Python 3.10 system-wide"
-# Add deadsnakes PPA for Python 3.10 on Ubuntu 24.04
-$STD add-apt-repository -y ppa:deadsnakes/ppa
-$STD apt-get update
-$STD apt-get install -y \
-  python3.10 \
-  python3.10-dev \
-  python3.10-venv \
-  python3.10-distutils \
-  python3-pip \
-  python3-venv
+# Install Python 3.10 using the helper function
+msg_info "Installing Python 3.10 via uv"
+export PYTHON_VERSION="3.10"
+setup_uv
+msg_ok "Installed Python 3.10 via uv"
 
-# Make Python 3.10 available as default 'python' and 'python3'
-update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
-update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
-ln -sf /usr/bin/python3.10 /usr/local/bin/python
-ln -sf /usr/bin/python3.10 /usr/local/bin/python3
-ln -sf /usr/bin/python3.10 /usr/local/bin/python3.10
-# Create pip symlink
+# Configure Python for KamiWaza compatibility
+msg_info "Configuring Python and pip for KamiWaza"
+# Get Python 3.10 path from uv and create alternatives
+PYTHON_310_PATH=$(uv python find 3.10)
+update-alternatives --install /usr/local/bin/python python "$PYTHON_310_PATH" 1
+update-alternatives --install /usr/local/bin/python3.10 python3.10 "$PYTHON_310_PATH" 1
+# Install pip and create symlink
+$STD apt-get install -y python3-pip python3-venv
 ln -sf /usr/bin/pip3 /usr/local/bin/pip
-msg_ok "Installed Python 3.10 system-wide"
+msg_ok "Configured Python and pip for KamiWaza"
 
 msg_info "Installing Graphics & Development Libraries"
 $STD apt-get install -y \
