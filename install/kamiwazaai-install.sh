@@ -38,30 +38,54 @@ $STD apt-get install -y \
   jq
 msg_ok "Installed Core System Dependencies"
 
-# Configure Python for KamiWaza (using system Python 3.12)
-msg_info "Configuring Python for KamiWaza"
-# Install Python development packages and pip
-$STD apt-get install -y python3-pip python3-venv python3-dev
-# Create python symlink for scripts that expect it
-ln -sf /usr/bin/python3 /usr/local/bin/python
-# Ensure /usr/local/bin is in PATH permanently
-echo 'export PATH="/usr/local/bin:$PATH"' > /etc/profile.d/usr-local-bin.sh
-chmod +x /etc/profile.d/usr-local-bin.sh
-# Ensure /usr/local/bin is in PATH for current session
-export PATH="/usr/local/bin:$PATH"
-msg_ok "Configured Python for KamiWaza"
+# Install Python 3.10 (required for KamiWaza CE)
+msg_info "Installing Python 3.10"
+$STD apt-get update
+$STD apt-get install -y software-properties-common
+$STD add-apt-repository -y ppa:deadsnakes/ppa
+$STD apt-get update && $STD apt-get upgrade -y
+$STD apt-get install -y python3.10
+# Create python symlink as specified in official docs
+ln -sf /usr/bin/python3.10 /usr/local/bin/python
+msg_ok "Installed Python 3.10"
 
-msg_info "Installing Graphics & Development Libraries"
+# Install system update and core packages
+msg_info "Installing core packages"
+$STD apt-get update && $STD apt-get upgrade -y
 $STD apt-get install -y \
+  python3.10 \
+  python3.10-dev \
+  libpython3.10-dev \
+  python3.10-venv \
+  golang-cfssl \
+  python-is-python3 \
+  etcd-client \
+  net-tools \
+  curl \
+  jq \
   libcairo2-dev \
   libgirepository1.0-dev
-msg_ok "Installed Graphics & Development Libraries"
 
-msg_info "Installing System Tools"
-$STD apt-get install -y \
-  golang-cfssl \
-  etcd-client
-msg_ok "Installed System Tools"
+# Ensure /usr/local/bin is in PATH permanently for all shells
+echo 'export PATH="/usr/local/bin:$PATH"' > /etc/profile.d/usr-local-bin.sh
+chmod +x /etc/profile.d/usr-local-bin.sh
+
+# Also add to /etc/environment for system-wide PATH (works for all contexts)
+if ! grep -q "/usr/local/bin" /etc/environment 2>/dev/null; then
+    # If /etc/environment exists and has PATH, update it
+    if [ -f /etc/environment ] && grep -q "PATH=" /etc/environment; then
+        sed -i 's|PATH="\(.*\)"|PATH="/usr/local/bin:\1"|' /etc/environment
+    else
+        # Create or append PATH to /etc/environment
+        echo 'PATH="/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' >> /etc/environment
+    fi
+fi
+
+# Ensure /usr/local/bin is in PATH for current session
+export PATH="/usr/local/bin:$PATH"
+msg_ok "Installed core packages"
+
+# Note: Graphics libraries and system tools already installed in core packages step
 
 msg_info "Installing Node.js 22"
 export NODE_VERSION="22"
@@ -84,8 +108,10 @@ usermod -aG docker root
 msg_ok "Installed Docker Engine + Compose v2"
 
 msg_info "Installing CockroachDB"
-wget -qO- https://binaries.cockroachdb.com/cockroach-v23.2.12.linux-amd64.tgz | tar xz &>/dev/null
+# Install CockroachDB as per official KamiWaza guide
+wget -qO- https://binaries.cockroachdb.com/cockroach-v23.2.12.linux-amd64.tgz | tar xvz &>/dev/null
 cp cockroach-v23.2.12.linux-amd64/cockroach /usr/local/bin/
+chmod +x /usr/local/bin/cockroach  # ADD THIS LINE
 rm -rf cockroach-v23.2.12.linux-amd64
 msg_ok "Installed CockroachDB"
 
@@ -110,8 +136,7 @@ export PATH="/usr/local/bin:$PATH"
 # Verify prerequisites are available
 msg_info "Verifying prerequisites for KamiWaza installer"
 echo "Python version: $(python --version)"
-echo "Python3 version: $(python3 --version)"
-echo "Pip version: $(pip3 --version)"
+echo "Python3.10 version: $(python3.10 --version)"
 echo "Node version: $(node --version)"
 echo "Docker version: $(docker --version)"
 echo "CockroachDB version: $(cockroach version --build-tag 2>/dev/null || echo 'Not found in PATH')"
@@ -189,7 +214,7 @@ msg_info "Saving Access Information"
   echo "System Requirements Met:"
   echo "- OS: Ubuntu ${UBUNTU_VERSION} LTS"
   echo "- Memory: ${TOTAL_MEM}MB (16GB+ required)"
-  echo "- Python: 3.10 (tarball installation)"
+  echo "- Python: (tarball installation)"
   echo "- Docker: Engine with Compose v2"
   echo "- Node.js: 22 (via NVM)"
   echo ""
