@@ -42,7 +42,18 @@ msg_ok "Installed Core System Dependencies"
 msg_info "Installing Python 3.10 via uv"
 export PYTHON_VERSION="3.10"
 setup_uv
-msg_ok "Installed Python 3.10 via uv"
+
+# Ensure Python 3.10 is available as 'python' and install pip
+msg_info "Configuring Python and pip"
+# Make Python 3.10 available as 'python'
+PYTHON_310_PATH=$(uv python find 3.10)
+ln -sf "$PYTHON_310_PATH" /usr/local/bin/python
+ln -sf "$PYTHON_310_PATH" /usr/local/bin/python3
+# Install pip for Python 3.10
+$STD apt-get install -y python3-pip python3-venv
+# Create pip symlink
+ln -sf /usr/bin/pip3 /usr/local/bin/pip
+msg_ok "Configured Python and pip"
 
 msg_info "Installing Graphics & Development Libraries"
 $STD apt-get install -y \
@@ -96,43 +107,61 @@ tar -xf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz" &>/dev/null
 echo "${KAMIWAZA_VERSION}" > "/opt/KamiWazaAI_version.txt"
 msg_ok "Downloaded KamiWaza CE v${KAMIWAZA_VERSION}"
 
+msg_info "Creating KamiWaza user"
+# Create a dedicated user for KamiWaza (since it won't run as root)
+useradd -r -m -s /bin/bash kamiwaza || true
+usermod -aG docker kamiwaza
+# Set ownership of KamiWaza directory
+chown -R kamiwaza:kamiwaza /opt/kamiwaza
+msg_ok "Created KamiWaza user"
+
 msg_info "Running KamiWaza Installer"
-# Set environment for installer
+# Set environment for installer - ensure all tools are available
 export PATH="/usr/local/bin:$PATH"
-$STD bash install.sh --community
+# Verify prerequisites are available
+msg_info "Verifying prerequisites for KamiWaza installer"
+echo "Python version: $(python --version)"
+echo "Python3 version: $(python3 --version)"
+echo "Pip version: $(pip --version)"
+echo "Node version: $(node --version)"
+echo "Docker version: $(docker --version)"
+msg_ok "Prerequisites verified"
+
+# Run installer without silencing output to debug issues
+msg_info "Executing KamiWaza installer as kamiwaza user"
+# Automatically accept EULA and continue installation
+echo -e "\nyes" | sudo -u kamiwaza bash install.sh --community
 msg_ok "KamiWaza Installation Completed"
 
-msg_info "Starting KamiWaza Services"
-$STD bash startup/kamiwazad.sh start
-msg_ok "KamiWaza Services Started"
+msg_info "Creating systemd service"
+cat <<EOF >/etc/systemd/system/kamiwaza.service
+[Unit]
+Description=KamiWaza AI Platform
+Documentation=https://docs.kamiwaza.ai/
+After=network.target docker.service
+Wants=docker.service
 
-msg_info "Creating Service Management Script"
-cat <<EOF >/usr/local/bin/kamiwaza-service
-#!/bin/bash
-cd /opt/kamiwaza
-case "\$1" in
-  start)
-    bash startup/kamiwazad.sh start
-    ;;
-  stop)
-    bash startup/kamiwazad.sh stop
-    ;;
-  restart)
-    bash startup/kamiwazad.sh stop
-    sleep 5
-    bash startup/kamiwazad.sh start
-    ;;
-  status)
-    bash startup/kamiwazad.sh status 2>/dev/null || echo "KamiWaza is not running"
-    ;;
-  *)
-    echo "Usage: \$0 {start|stop|restart|status}"
-    exit 1
-    ;;
-esac
+[Service]
+Type=forking
+User=kamiwaza
+Group=kamiwaza
+WorkingDirectory=/opt/kamiwaza
+ExecStart=/opt/kamiwaza/startup/kamiwazad.sh start
+ExecStop=/opt/kamiwaza/startup/kamiwazad.sh stop
+ExecReload=/opt/kamiwaza/startup/kamiwazad.sh restart
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=300
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
 EOF
-chmod +x /usr/local/bin/kamiwaza-service
-msg_ok "Created Service Management Script"
+
+systemctl daemon-reload
+systemctl enable kamiwaza
+systemctl start kamiwaza
+msg_ok "Created and started systemd service"
 
 
 msg_info "Checking GPU Support"
@@ -175,10 +204,10 @@ msg_info "Saving Access Information"
   fi
   echo ""
   echo "Service Management:"
-  echo "Start:   kamiwaza-service start"
-  echo "Stop:    kamiwaza-service stop"
-  echo "Restart: kamiwaza-service restart"
-  echo "Status:  kamiwaza-service status"
+  echo "Start:   systemctl start kamiwaza"
+  echo "Stop:    systemctl stop kamiwaza"
+  echo "Restart: systemctl restart kamiwaza"
+  echo "Status:  systemctl status kamiwaza"
   echo ""
   echo "Installation Directory: /opt/kamiwaza"
   echo "Version: ${KAMIWAZA_VERSION}"

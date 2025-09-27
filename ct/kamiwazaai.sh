@@ -43,12 +43,9 @@ function update_script() {
   if [[ "${LATEST_VERSION}" != "${CURRENT_VERSION}" ]]; then
     msg_info "Updating ${APP} to v${LATEST_VERSION}"
 
-    msg_info "Stopping KamiWaza Services"
-    cd /opt/kamiwaza || exit
-    if [[ -f startup/kamiwazad.sh ]]; then
-      $STD bash startup/kamiwazad.sh stop
-    fi
-    msg_ok "Services Stopped"
+    msg_info "Stopping KamiWaza Service"
+    $STD systemctl stop kamiwaza
+    msg_ok "Service Stopped"
 
     msg_info "Creating backup"
     cp -r /opt/kamiwaza /opt/kamiwaza-backup
@@ -64,12 +61,13 @@ function update_script() {
 
     msg_info "Running KamiWaza installer"
     export PATH="/usr/local/bin:$PATH"
-    $STD bash install.sh --community
+    chown -R kamiwaza:kamiwaza /opt/kamiwaza
+    $STD sudo -u kamiwaza bash install.sh --community
     msg_ok "Installation completed"
 
-    msg_info "Starting KamiWaza Services"
-    $STD bash startup/kamiwazad.sh start
-    msg_ok "Services Started"
+    msg_info "Starting KamiWaza Service"
+    $STD systemctl start kamiwaza
+    msg_ok "Service Started"
 
     msg_info "Cleanup"
     rm -rf /opt/kamiwaza-community-"${LATEST_VERSION}"-UbuntuLinux.tar.gz
@@ -98,4 +96,4 @@ echo -e "${TAB}${GATEWAY}${BGN}Password: kamiwaza${CL}"
 echo -e "${INFO}${YW} System Info:${CL}"
 echo -e "${TAB}${GATEWAY}${BGN}Memory: 16GB+ (Minimum for KamiWaza)${CL}"
 echo -e "${TAB}${GATEWAY}${BGN}Storage: 25GB (10GB+ required)${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}Service: kamiwaza-service {start|stop|restart|status}${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}Service: systemctl {start|stop|restart|status} kamiwaza${CL}"
