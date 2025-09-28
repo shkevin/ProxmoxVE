@@ -6,7 +6,7 @@ source <(curl -fsSL https://raw.githubusercontent.com/shkevin/ProxmoxVE/refs/hea
 # Source: https://github.com/kamiwaza-ai/kamiwaza-community-edition
 
 APP="KamiWazaAI"
-var_tags="${var_tags:-ai;machine-learning}"
+var_tags="${var_tags:-ai;machine-learning;gpu-acceleration}"
 var_cpu="${var_cpu:-8}"
 var_ram="${var_ram:-16384}"
 var_disk="${var_disk:-35}"
