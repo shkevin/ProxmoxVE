@@ -124,17 +124,19 @@ mkdir -p "$KAMIWAZA_DIR"
 mkdir -p "$KAMIWAZA_LOG_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
+export KAMIWAZA_ENV=production
 # Set log directory environment variable system-wide for all users
 echo "KAMIWAZA_LOG_DIR=\"$KAMIWAZA_LOG_DIR\"" >> /etc/environment
+# echo "KAMIWAZA_ENV=production" >> /etc/environment
 
 # Also set for kamiwaza user specifically
 echo "export KAMIWAZA_LOG_DIR=\"$KAMIWAZA_LOG_DIR\"" >> /home/kamiwaza/.bashrc
 echo "export KAMIWAZA_LOG_DIR=\"$KAMIWAZA_LOG_DIR\"" >> /home/kamiwaza/.profile
 
-# Run the installation as root (for system-level access)
+# Run the installation as kamiwaza user (matching KamiWaza's design)
 cd "$KAMIWAZA_DIR" || exit
 
-# Get the latest version or use fallback
+# Download and extract as root, then switch to kamiwaza for installation
 KAMIWAZA_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/contents/ 2>/dev/null | jq -r '.[] | select(.name | test("kamiwaza-community-.*-UbuntuLinux.tar.gz")) | .name' 2>/dev/null | sed 's/kamiwaza-community-\(.*\)-UbuntuLinux.tar.gz/\1/' | sort -V | tail -1)
 if [[ -z "$KAMIWAZA_VERSION" ]]; then
     KAMIWAZA_VERSION="0.5.0"
@@ -143,44 +145,46 @@ fi
 wget "https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 tar -xvf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 
-# Ensure Node.js is available for installer
-export NODE_PATH=/usr/bin/node
-export NPM_PATH=/usr/bin/npm
+# Set ownership to kamiwaza before installation
+chown -R kamiwaza:kamiwaza .
 
-# Run the installer with automatic EULA acceptance (as root)
-echo -e '\n\nyes' | KAMIWAZA_LOG_DIR=$KAMIWAZA_LOG_DIR bash install.sh --community
+# Run the installer as kamiwaza user
+sudo -u kamiwaza bash -c "
+    cd '$KAMIWAZA_DIR'
+    export PATH='/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+    export NODE_PATH=/usr/bin/node
+    export NPM_PATH=/usr/bin/npm
+    export KAMIWAZA_LOG_DIR='$KAMIWAZA_LOG_DIR'
+    echo -e '\n\nyes' | bash install.sh --community
+"
 
 # Fix missing Milvus architecture folder (critical for container validation)
-if [ -d "kamiwaza/deployment/kamiwaza-milvus/amd64-gpu" ] && [ ! -e "kamiwaza/deployment/kamiwaza-milvus/amd64" ]; then
-    ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
-fi
+# if [ -d "kamiwaza/deployment/kamiwaza-milvus/amd64-gpu" ] && [ ! -e "kamiwaza/deployment/kamiwaza-milvus/amd64" ]; then
+#     ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
+# fi
 
 # Clean up tarball
 rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 
-# Set proper ownership after installation
+# Ensure proper ownership is maintained (should already be correct since installed as kamiwaza)
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
 
-# Create notebook virtual environment if it doesn't exist
-if [[ ! -d "/opt/kamiwaza/notebook-venv" ]]; then
-    msg_info "Creating notebook virtual environment"
-    cd /opt/kamiwaza || exit
-    python3.10 -m venv notebook-venv
-
-    # Install Jupyter packages in the notebook venv
-    source notebook-venv/bin/activate
-    pip install --upgrade pip
-    pip install jupyterlab notebook ipykernel
-    deactivate
-
-    # Set ownership to kamiwaza user
-    chown -R kamiwaza:kamiwaza notebook-venv
-    msg_ok "Created notebook virtual environment"
-else
-    msg_info "Notebook virtual environment already exists"
-fi
-
+# Create notebook virtual environment if it doesn't exist (as kamiwaza user)
+# if [[ ! -d "/opt/kamiwaza/notebook-venv" ]]; then
+#     msg_info "Creating notebook virtual environment"
+#     sudo -u kamiwaza bash -c "
+#         cd /opt/kamiwaza
+#         python3.10 -m venv notebook-venv
+#         source notebook-venv/bin/activate
+#         pip install --upgrade pip
+#         pip install jupyterlab notebook ipykernel
+#         deactivate
+#     "
+#     msg_ok "Created notebook virtual environment"
+# else
+#     msg_info "Notebook virtual environment already exists"
+# fi
 
 INSTALLATION_STATUS=$?
 if [[ $INSTALLATION_STATUS -eq 0 ]]; then
@@ -238,6 +242,9 @@ EOF
 systemctl daemon-reload
 systemctl enable kamiwaza.service
 msg_ok "Created systemd service"
+
+chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
+chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
 
 msg_info "Starting KamiWaza service"
 systemctl start kamiwaza.service
