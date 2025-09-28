@@ -124,7 +124,10 @@ mkdir -p "$KAMIWAZA_DIR"
 mkdir -p "$KAMIWAZA_LOG_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
-# Set log directory environment variable for kamiwaza user
+# Set log directory environment variable system-wide for all users
+echo "KAMIWAZA_LOG_DIR=\"$KAMIWAZA_LOG_DIR\"" >> /etc/environment
+
+# Also set for kamiwaza user specifically
 echo "export KAMIWAZA_LOG_DIR=\"$KAMIWAZA_LOG_DIR\"" >> /home/kamiwaza/.bashrc
 echo "export KAMIWAZA_LOG_DIR=\"$KAMIWAZA_LOG_DIR\"" >> /home/kamiwaza/.profile
 
@@ -145,12 +148,12 @@ export NODE_PATH=/usr/bin/node
 export NPM_PATH=/usr/bin/npm
 
 # Run the installer with automatic EULA acceptance (as root)
-echo -e '\n\nyes' | bash install.sh --community
+echo -e '\n\nyes' | KAMIWAZA_LOG_DIR=$KAMIWAZA_LOG_DIR bash install.sh --community
 
 # Fix missing Milvus architecture folder (critical for container validation)
-# if [ -d "kamiwaza/deployment/kamiwaza-milvus/amd64-gpu" ] && [ ! -e "kamiwaza/deployment/kamiwaza-milvus/amd64" ]; then
-#     ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
-# fi
+if [ -d "kamiwaza/deployment/kamiwaza-milvus/amd64-gpu" ] && [ ! -e "kamiwaza/deployment/kamiwaza-milvus/amd64" ]; then
+    ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
+fi
 
 # Clean up tarball
 rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
