@@ -11,65 +11,87 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Setting Up GPU Compute Support for AI/ML"
-$STD apt-get -y install {ocl-icd-libopencl1,clinfo,mesa-opencl-icd}
+# msg_info "Setting Up GPU Compute Support for AI/ML"
+# # Detect available GPUs
+# INTEL_GPU_DETECTED=false
+# AMD_GPU_DETECTED=false
 
-if [[ "$CTTYPE" == "0" ]]; then
-  # Set up GPU device permissions
-  if [[ -d /dev/dri ]]; then
-    chgrp video /dev/dri
-    chmod 755 /dev/dri
-    chmod 660 /dev/dri/* 2>/dev/null || true
-  fi
-  $STD adduser "$(id -u -n)" video
-  $STD adduser "$(id -u -n)" render
-fi
-msg_ok "Set Up Base GPU Compute Support"
+# if lspci | grep -i "vga\|3d\|display" | grep -i intel &> /dev/null; then
+#   INTEL_GPU_DETECTED=true
+#   msg_info "Intel GPU detected"
+# fi
 
-# Intel GPU compute support for AI workloads
-read -r -p "${TAB3}Install Intel GPU compute support for AI workloads? <y/N> " intel_prompt
-if [[ ${intel_prompt,,} =~ ^(y|yes)$ ]]; then
-  msg_info "Installing Intel GPU compute support"
+# if lspci | grep -i "vga\|3d\|display" | grep -i "amd\|radeon" &> /dev/null; then
+#   AMD_GPU_DETECTED=true
+#   msg_info "AMD GPU detected"
+# fi
 
-  # Add Intel GPU repositories
-  mkdir -p /etc/apt/keyrings
-  curl -fsSL https://repositories.intel.com/gpu/intel-graphics.key | gpg --dearmor -o /etc/apt/keyrings/intel-graphics.gpg
-  echo "deb [arch=amd64,i386 signed-by=/etc/apt/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu jammy client" >/etc/apt/sources.list.d/intel-gpu-jammy.list
-  curl -fsSL https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor -o /etc/apt/keyrings/oneapi-archive-keyring.gpg
-  echo "deb [signed-by=/etc/apt/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" >/etc/apt/sources.list.d/oneAPI.list
-  $STD apt-get update
+# if [[ "$INTEL_GPU_DETECTED" == "false" && "$AMD_GPU_DETECTED" == "false" ]]; then
+#   msg_info "No Intel or AMD GPU detected - installing basic OpenCL support only"
+# fi
 
-  # Install Intel compute packages
-  $STD apt-get -y install {intel-opencl-icd,intel-level-zero-gpu,level-zero,level-zero-dev,intel-gpu-tools}
+# $STD apt-get -y install {ocl-icd-libopencl1,clinfo,mesa-opencl-icd}
 
-  msg_ok "Installed Intel GPU compute support"
-fi
+# if [[ "$CTTYPE" == "0" ]]; then
+#   # Set up GPU device permissions
+#   if [[ -d /dev/dri ]]; then
+#     chgrp video /dev/dri
+#     chmod 755 /dev/dri
+#     chmod 660 /dev/dri/* 2>/dev/null || true
+#   fi
+#   $STD adduser "$(id -u -n)" video
+#   $STD adduser "$(id -u -n)" render
+# fi
+# msg_ok "Set Up Base GPU Compute Support"
 
-# AMD GPU compute support for AI workloads
-read -r -p "${TAB3}Install AMD GPU compute support for AI workloads? <y/N> " amd_prompt
-if [[ ${amd_prompt,,} =~ ^(y|yes)$ ]]; then
-  msg_info "Installing AMD GPU compute support"
+# # Intel GPU compute support for AI workloads (only if detected)
+# if [[ "$INTEL_GPU_DETECTED" == "true" ]]; then
+#   read -r -p "${TAB3}Install Intel GPU compute support for AI workloads? <y/N> " intel_prompt
+#   if [[ ${intel_prompt,,} =~ ^(y|yes)$ ]]; then
+#     msg_info "Installing Intel GPU compute support"
 
-  # Install AMD compute packages
-  $STD apt-get -y install {mesa-opencl-icd,radeontop}
+#     # Add Intel GPU repositories
+#     mkdir -p /etc/apt/keyrings
+#     curl -fsSL https://repositories.intel.com/gpu/intel-graphics.key | gpg --dearmor -o /etc/apt/keyrings/intel-graphics.gpg
+#     echo "deb [arch=amd64,i386 signed-by=/etc/apt/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu jammy client" >/etc/apt/sources.list.d/intel-gpu-jammy.list
+#     curl -fsSL https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor -o /etc/apt/keyrings/oneapi-archive-keyring.gpg
+#     echo "deb [signed-by=/etc/apt/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" >/etc/apt/sources.list.d/oneAPI.list
+#     $STD apt-get update
 
-  # Check if user wants ROCm for advanced compute
-  read -r -p "${TAB3}Install AMD ROCm for advanced GPU compute? (Large download) <y/N> " rocm_prompt
-  if [[ ${rocm_prompt,,} =~ ^(y|yes)$ ]]; then
-    msg_info "Installing AMD ROCm"
+#     # Install Intel compute packages
+#     $STD apt-get -y install {intel-opencl-icd,intel-level-zero-gpu,level-zero,level-zero-dev,intel-gpu-tools}
 
-    # Add ROCm repository
-    curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
-    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.0.2 jammy main" > /etc/apt/sources.list.d/rocm.list
-    $STD apt-get update
+#     msg_ok "Installed Intel GPU compute support"
+#   fi
+# fi
 
-    # Install basic ROCm packages
-    $STD apt-get -y install {rocm-dev,rocm-libs,rocm-utils}
+# # AMD GPU compute support for AI workloads (only if detected)
+# if [[ "$AMD_GPU_DETECTED" == "true" ]]; then
+#   read -r -p "${TAB3}Install AMD GPU compute support for AI workloads? <y/N> " amd_prompt
+#   if [[ ${amd_prompt,,} =~ ^(y|yes)$ ]]; then
+#     msg_info "Installing AMD GPU compute support"
 
-    msg_ok "Installed AMD ROCm"
-  fi
-  msg_ok "Installed AMD GPU compute support"
-fi
+#     # Install AMD compute packages
+#     $STD apt-get -y install {mesa-opencl-icd,radeontop}
+
+#     # Check if user wants ROCm for advanced compute
+#     read -r -p "${TAB3}Install AMD ROCm for advanced GPU compute? (Large download) <y/N> " rocm_prompt
+#     if [[ ${rocm_prompt,,} =~ ^(y|yes)$ ]]; then
+#       msg_info "Installing AMD ROCm"
+
+#       # Add ROCm repository
+#       curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
+#       echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.0.2 jammy main" > /etc/apt/sources.list.d/rocm.list
+#       $STD apt-get update
+
+#       # Install basic ROCm packages
+#       $STD apt-get -y install {rocm-dev,rocm-libs,rocm-utils}
+
+#       msg_ok "Installed AMD ROCm"
+#     fi
+#     msg_ok "Installed AMD GPU compute support"
+#   fi
+# fi
 
 msg_info "Installing Dependencies"
 # Add deadsnakes PPA for Python 3.10
