@@ -99,8 +99,9 @@ if ! id "kamiwaza" &>/dev/null; then
 fi
 usermod -aG docker kamiwaza
 
-# Note: Avoiding sudo for kamiwaza user - install as non-privileged user
-# If KamiWaza installer requires sudo, we may need to add it back
+# Add kamiwaza to sudo group for passwordless sudo (needed for startup/shutdown)
+usermod -aG sudo kamiwaza
+echo "kamiwaza ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/kamiwaza-temp
 
 # Add GPU group memberships for compute access
 if [[ "$CTTYPE" == "0" ]]; then
@@ -118,12 +119,14 @@ echo 'export PATH="/usr/local/bin:$PATH"' >> /root/.bashrc
 
 # Set up the installation directory
 KAMIWAZA_DIR="/opt/kamiwaza"
-KAMIWAZA_LOG_DIR="/home/kamiwaza/logs"
+KAMIWAZA_LOG_DIR="/opt/kamiwaza/logs"
 mkdir -p "$KAMIWAZA_DIR"
 mkdir -p "$KAMIWAZA_LOG_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
+# Set log directory environment variable for kamiwaza user
 echo "export KAMIWAZA_LOG_DIR=\"$KAMIWAZA_LOG_DIR\"" >> /home/kamiwaza/.bashrc
+echo "export KAMIWAZA_LOG_DIR=\"$KAMIWAZA_LOG_DIR\"" >> /home/kamiwaza/.profile
 
 # Run the installation as root (for system-level access)
 cd "$KAMIWAZA_DIR" || exit
@@ -145,9 +148,9 @@ export NPM_PATH=/usr/bin/npm
 echo -e '\n\nyes' | bash install.sh --community
 
 # Fix missing Milvus architecture folder (critical for container validation)
-if [ -d "kamiwaza/deployment/kamiwaza-milvus/amd64-gpu" ] && [ ! -e "kamiwaza/deployment/kamiwaza-milvus/amd64" ]; then
-    ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
-fi
+# if [ -d "kamiwaza/deployment/kamiwaza-milvus/amd64-gpu" ] && [ ! -e "kamiwaza/deployment/kamiwaza-milvus/amd64" ]; then
+#     ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
+# fi
 
 # Clean up tarball
 rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
@@ -155,6 +158,26 @@ rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 # Set proper ownership after installation
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
+
+# Create notebook virtual environment if it doesn't exist
+if [[ ! -d "/opt/kamiwaza/notebook-venv" ]]; then
+    msg_info "Creating notebook virtual environment"
+    cd /opt/kamiwaza || exit
+    python3.10 -m venv notebook-venv
+
+    # Install Jupyter packages in the notebook venv
+    source notebook-venv/bin/activate
+    pip install --upgrade pip
+    pip install jupyterlab notebook ipykernel
+    deactivate
+
+    # Set ownership to kamiwaza user
+    chown -R kamiwaza:kamiwaza notebook-venv
+    msg_ok "Created notebook virtual environment"
+else
+    msg_info "Notebook virtual environment already exists"
+fi
+
 
 INSTALLATION_STATUS=$?
 if [[ $INSTALLATION_STATUS -eq 0 ]]; then
@@ -247,6 +270,7 @@ UBUNTU_VERSION=$(lsb_release -rs)
   echo "- View logs: ls $KAMIWAZA_LOG_DIR/logs/"
   echo "- Monitor startup: bash $KAMIWAZA_LOG_DIR/startup/kamiwazad.sh status -w"
   echo "- Test GPU compute: clinfo"
+  echo "- Logs: tail -f /opt/kamiwaza/logs/*.log"
 } > /home/kamiwaza/kamiwaza-access-info.txt
 
 chown kamiwaza:kamiwaza /home/kamiwaza/kamiwaza-access-info.txt
@@ -255,6 +279,10 @@ msg_ok "Access information saved to ~/kamiwaza-access-info.txt"
 
 msg_info "Cleaning up and finalizing installation"
 cd /root || exit
+
+# Remove temporary sudo permissions (no longer needed after installation)
+rm -f /etc/sudoers.d/kamiwaza-temp
+
 $STD apt-get -y autoremove
 $STD apt-get -y autoclean
 msg_ok "Cleaned up installation files"
