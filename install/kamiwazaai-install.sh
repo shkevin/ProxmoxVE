@@ -12,6 +12,9 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
+# Install software-properties-common first for add-apt-repository
+$STD apt-get install -y software-properties-common
+
 # Add deadsnakes PPA for Python 3.10
 $STD add-apt-repository ppa:deadsnakes/ppa -y
 $STD apt-get update
@@ -31,7 +34,6 @@ $STD apt-get install -y \
     libgirepository1.0-dev \
     apt-transport-https \
     ca-certificates \
-    software-properties-common \
     gnupg \
     lsb-release \
     bc
