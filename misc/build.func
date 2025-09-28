@@ -1184,6 +1184,7 @@ EOF
     "Ollama"
     "FileFlows"
     "Open WebUI"
+    "KamiWazaAI"
   )
 
   is_vaapi_app=false

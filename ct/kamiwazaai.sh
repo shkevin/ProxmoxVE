@@ -6,12 +6,12 @@ source <(curl -fsSL https://raw.githubusercontent.com/shkevin/ProxmoxVE/refs/hea
 # Source: https://github.com/kamiwaza-ai/kamiwaza-community-edition
 
 APP="KamiWazaAI"
-var_tags="${var_tags:-ai;machine-learning;docker;gpu}"
+var_tags="${var_tags:-ai;machine-learning}"
 var_cpu="${var_cpu:-8}"
 var_ram="${var_ram:-16384}"
 var_disk="${var_disk:-35}"
-var_os="${var_os:-debian}"
-var_version="${var_version:-13}"
+var_os="${var_os:-ubuntu}"
+var_version="${var_version:-22.04}"
 var_unprivileged="${var_unprivileged:-0}"
 
 # App Output & Base Settings
