@@ -41,11 +41,12 @@ msg_ok "Installed Dependencies"
 
 msg_info "Installing Node.js 22"
 # Install Node.js globally as root to avoid NVM permission issues
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-$STD apt-get install -y nodejs
+# curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+# $STD apt-get install -y nodejs
 
-# Install global packages required by KamiWaza
-npm install -g webpack webpack-cli pm2
+# # Install global packages required by KamiWaza
+# npm install -g webpack webpack-cli pm2
+NODE_VERSION="22" NODE_MODULE="webpack@latest,webpack-cli@latest,pm2@latest" setup_nodejs
 
 # Make Node.js available for all users
 chmod a+rx /usr/bin/node /usr/bin/npm /usr/bin/npx
@@ -89,6 +90,7 @@ else
   msg_info "No NVIDIA GPU detected - CPU-only mode"
   msg_info "For GPU support, install NVIDIA drivers and nvidia-container-toolkit"
   msg_info "Refer to step 6 in the official installation guide for GPU setup"
+  msg_info "guide: https://docs.kamiwaza.ai/installation/linux_macos_tarball"
 fi
 
 msg_info "Creating kamiwaza user"
@@ -97,9 +99,8 @@ if ! id "kamiwaza" &>/dev/null; then
 fi
 usermod -aG docker kamiwaza
 
-# Add kamiwaza to sudo group for passwordless sudo (temporary for installation)
-usermod -aG sudo kamiwaza
-echo "kamiwaza ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/kamiwaza-temp
+# Note: Avoiding sudo for kamiwaza user - install as non-privileged user
+# If KamiWaza installer requires sudo, we may need to add it back
 
 # Add GPU group memberships for compute access
 if [[ "$CTTYPE" == "0" ]]; then
@@ -124,38 +125,36 @@ chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
 echo "export KAMIWAZA_LOG_DIR=\"$KAMIWAZA_LOG_DIR\"" >> /home/kamiwaza/.bashrc
 
-# Run the installation as the kamiwaza user
-sudo -u kamiwaza bash -c "
-    export PATH='/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\$PATH'
-    cd '$KAMIWAZA_DIR'
+# Run the installation as root (for system-level access)
+cd "$KAMIWAZA_DIR" || exit
 
-    # Get the latest version or use fallback
-    KAMIWAZA_VERSION=\$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/contents/ 2>/dev/null | jq -r '.[] | select(.name | test(\"kamiwaza-community-.*-UbuntuLinux.tar.gz\")) | .name' 2>/dev/null | sed 's/kamiwaza-community-\(.*\)-UbuntuLinux.tar.gz/\1/' | sort -V | tail -1)
-    if [[ -z \"\$KAMIWAZA_VERSION\" ]]; then
-        KAMIWAZA_VERSION=\"0.5.0\"
-    fi
+# Get the latest version or use fallback
+KAMIWAZA_VERSION=$(curl -fsSL https://api.github.com/repos/kamiwaza-ai/kamiwaza-community-edition/contents/ 2>/dev/null | jq -r '.[] | select(.name | test("kamiwaza-community-.*-UbuntuLinux.tar.gz")) | .name' 2>/dev/null | sed 's/kamiwaza-community-\(.*\)-UbuntuLinux.tar.gz/\1/' | sort -V | tail -1)
+if [[ -z "$KAMIWAZA_VERSION" ]]; then
+    KAMIWAZA_VERSION="0.5.0"
+fi
 
-    wget \"https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-\${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz\"
-    tar -xvf \"kamiwaza-community-\${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz\"
+wget "https://github.com/kamiwaza-ai/kamiwaza-community-edition/raw/main/kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
+tar -xvf "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 
-    # Set up proper environment for the user
-    echo 'export PATH=\"/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\$PATH\"' >> ~/.bashrc
+# Ensure Node.js is available for installer
+export NODE_PATH=/usr/bin/node
+export NPM_PATH=/usr/bin/npm
 
-    # Ensure Node.js is available
-    export NODE_PATH=/usr/bin/node
-    export NPM_PATH=/usr/bin/npm
+# Run the installer with automatic EULA acceptance (as root)
+echo -e '\n\nyes' | bash install.sh --community
 
-    # Run the installer with automatic EULA acceptance
-    echo -e '\n\nyes' | bash install.sh --community
+# Fix missing Milvus architecture folder (critical for container validation)
+if [ -d "kamiwaza/deployment/kamiwaza-milvus/amd64-gpu" ] && [ ! -e "kamiwaza/deployment/kamiwaza-milvus/amd64" ]; then
+    ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
+fi
 
-    # Fix missing Milvus architecture folder (critical for container validation)
-    if [ -d \"kamiwaza/deployment/kamiwaza-milvus/amd64-gpu\" ] && [ ! -e \"kamiwaza/deployment/kamiwaza-milvus/amd64\" ]; then
-        ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
-    fi
+# Clean up tarball
+rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 
-    # Clean up tarball
-    rm -f \"kamiwaza-community-\${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz\"
-"
+# Set proper ownership after installation
+chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
+chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
 
 INSTALLATION_STATUS=$?
 if [[ $INSTALLATION_STATUS -eq 0 ]]; then
@@ -194,12 +193,12 @@ RestartSec=30
 TimeoutStartSec=600
 TimeoutStopSec=120
 
-# Security settings
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
+# Security settings (relaxed for KamiWaza requirements)
+NoNewPrivileges=false
+PrivateTmp=false
+ProtectSystem=false
 ProtectHome=false
-ReadWritePaths=/opt/kamiwaza /var/log
+ReadWritePaths=/opt/kamiwaza /var/log /home/kamiwaza
 SupplementaryGroups=docker
 
 # Logging
