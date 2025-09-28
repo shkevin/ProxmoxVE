@@ -39,8 +39,18 @@ $STD apt-get install -y \
     bc
 msg_ok "Installed Dependencies"
 
-msg_info "Installing Node.js"
-NODE_VERSION="22" NODE_MODULE="webpack@latest,webpack-cli@latest,pm2@latest" setup_nodejs
+msg_info "Installing Node.js 22"
+# Install Node.js globally as root to avoid NVM permission issues
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+$STD apt-get install -y nodejs
+
+# Install global packages required by KamiWaza
+npm install -g webpack webpack-cli pm2
+
+# Make Node.js available for all users
+chmod a+rx /usr/bin/node /usr/bin/npm /usr/bin/npx
+
+msg_ok "Installed Node.js 22 and required packages"
 
 msg_info "Installing Docker"
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg &>/dev/null
@@ -61,6 +71,25 @@ cp cockroach-v23.2.12.linux-amd64/cockroach /usr/local/bin/
 chmod +x /usr/local/bin/cockroach
 rm -rf cockroach-v23.2.12.linux-amd64
 msg_ok "Installed CockroachDB"
+
+# Check for NVIDIA GPU support
+msg_info "Checking GPU Support"
+if command -v nvidia-smi &> /dev/null; then
+  GPU_INFO=$(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader,nounits 2>/dev/null | head -1)
+  if [[ -n "$GPU_INFO" ]]; then
+    msg_info "NVIDIA GPU detected: $GPU_INFO"
+    COMPUTE_CAP=$(echo "$GPU_INFO" | cut -d',' -f2 | tr -d ' ')
+    if (( $(echo "$COMPUTE_CAP >= 7.0" | bc -l 2>/dev/null || echo "0") )); then
+      msg_ok "GPU meets KamiWaza requirements (Compute Capability 7.0+)"
+    else
+      msg_info "GPU Compute Capability $COMPUTE_CAP may not meet requirements (7.0+ recommended)"
+    fi
+  fi
+else
+  msg_info "No NVIDIA GPU detected - CPU-only mode"
+  msg_info "For GPU support, install NVIDIA drivers and nvidia-container-toolkit"
+  msg_info "Refer to step 6 in the official installation guide for GPU setup"
+fi
 
 msg_info "Creating kamiwaza user"
 if ! id "kamiwaza" &>/dev/null; then
