@@ -280,9 +280,6 @@ msg_ok "Access information saved to ~/kamiwaza-access-info.txt"
 msg_info "Cleaning up and finalizing installation"
 cd /root || exit
 
-# Remove temporary sudo permissions (no longer needed after installation)
-rm -f /etc/sudoers.d/kamiwaza-temp
-
 $STD apt-get -y autoremove
 $STD apt-get -y autoclean
 msg_ok "Cleaned up installation files"
