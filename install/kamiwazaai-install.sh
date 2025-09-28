@@ -97,6 +97,10 @@ if ! id "kamiwaza" &>/dev/null; then
 fi
 usermod -aG docker kamiwaza
 
+# Add kamiwaza to sudo group for passwordless sudo (temporary for installation)
+usermod -aG sudo kamiwaza
+echo "kamiwaza ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/kamiwaza-temp
+
 # Add GPU group memberships for compute access
 if [[ "$CTTYPE" == "0" ]]; then
     usermod -aG video kamiwaza 2>/dev/null || true
