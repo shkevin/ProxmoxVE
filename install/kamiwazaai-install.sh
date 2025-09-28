@@ -159,9 +159,10 @@ sudo -u kamiwaza bash -c "
 "
 
 # Fix missing Milvus architecture folder (critical for container validation)
-# if [ -d "kamiwaza/deployment/kamiwaza-milvus/amd64-gpu" ] && [ ! -e "kamiwaza/deployment/kamiwaza-milvus/amd64" ]; then
-#     ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
-# fi
+if [ -d "kamiwaza/deployment/kamiwaza-milvus/amd64-gpu" ] && [ ! -e "kamiwaza/deployment/kamiwaza-milvus/amd64" ]; then
+    # Create symlink as kamiwaza user to maintain proper permissions
+    sudo -u kamiwaza ln -s amd64-gpu kamiwaza/deployment/kamiwaza-milvus/amd64
+fi
 
 # Clean up tarball
 rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
@@ -169,22 +170,6 @@ rm -f "kamiwaza-community-${KAMIWAZA_VERSION}-UbuntuLinux.tar.gz"
 # Ensure proper ownership is maintained (should already be correct since installed as kamiwaza)
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
 chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
-
-# Create notebook virtual environment if it doesn't exist (as kamiwaza user)
-# if [[ ! -d "/opt/kamiwaza/notebook-venv" ]]; then
-#     msg_info "Creating notebook virtual environment"
-#     sudo -u kamiwaza bash -c "
-#         cd /opt/kamiwaza
-#         python3.10 -m venv notebook-venv
-#         source notebook-venv/bin/activate
-#         pip install --upgrade pip
-#         pip install jupyterlab notebook ipykernel
-#         deactivate
-#     "
-#     msg_ok "Created notebook virtual environment"
-# else
-#     msg_info "Notebook virtual environment already exists"
-# fi
 
 INSTALLATION_STATUS=$?
 if [[ $INSTALLATION_STATUS -eq 0 ]]; then
@@ -194,60 +179,63 @@ else
     exit 1
 fi
 
-msg_info "Creating systemd service"
-cat > /etc/systemd/system/kamiwaza.service << 'EOF'
-[Unit]
-Description=KamiWaza Community Edition AI Platform
-Documentation=https://github.com/kamiwaza-ai/kamiwaza-community-edition
-After=network-online.target docker.service
-Wants=network-online.target
-Requires=docker.service
+# msg_info "Creating systemd service"
+# cat > /etc/systemd/system/kamiwaza.service << 'EOF'
+# [Unit]
+# Description=KamiWaza Community Edition AI Platform
+# Documentation=https://github.com/kamiwaza-ai/kamiwaza-community-edition
+# After=network-online.target docker.service
+# Wants=network-online.target
+# Requires=docker.service
 
-[Service]
-Type=exec
-User=kamiwaza
-Group=kamiwaza
-WorkingDirectory=/opt/kamiwaza/
-Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
-Environment=KAMIWAZA_LOG_DIR=/opt/kamiwaza/logs
-Environment=NODE_PATH=/usr/bin/node
-Environment=NPM_PATH=/usr/bin/npm
+# [Service]
+# Type=exec
+# User=kamiwaza
+# Group=kamiwaza
+# WorkingDirectory=/opt/kamiwaza/
+# Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+# Environment=KAMIWAZA_LOG_DIR=/opt/kamiwaza/logs
+# Environment=NODE_PATH=/usr/bin/node
+# Environment=NPM_PATH=/usr/bin/npm
 
-ExecStart=/bin/bash startup/kamiwazad.sh start
-ExecStop=/bin/bash startup/kamiwazad.sh stop
-ExecReload=/bin/bash startup/kamiwazad.sh restart
+# ExecStart=/bin/bash startup/kamiwazad.sh start
+# ExecStop=/bin/bash startup/kamiwazad.sh stop
+# ExecReload=/bin/bash startup/kamiwazad.sh restart
 
-# Service behavior
-Restart=on-failure
-RestartSec=30
-TimeoutStartSec=600
-TimeoutStopSec=120
+# # Service behavior
+# Restart=on-failure
+# RestartSec=30
+# TimeoutStartSec=600
+# TimeoutStopSec=120
 
-# Security settings (relaxed for KamiWaza requirements)
-NoNewPrivileges=false
-PrivateTmp=false
-ProtectSystem=false
-ProtectHome=false
-ReadWritePaths=/opt/kamiwaza /var/log /home/kamiwaza
-SupplementaryGroups=docker
+# # Security settings (relaxed for KamiWaza requirements)
+# NoNewPrivileges=false
+# PrivateTmp=false
+# ProtectSystem=false
+# ProtectHome=false
+# ReadWritePaths=/opt/kamiwaza /var/log /home/kamiwaza
+# SupplementaryGroups=docker
 
-# Logging
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=kamiwaza
+# # Logging
+# StandardOutput=journal
+# StandardError=journal
+# SyslogIdentifier=kamiwaza
 
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl daemon-reload
-systemctl enable kamiwaza.service
-msg_ok "Created systemd service"
+# [Install]
+# WantedBy=multi-user.target
+# EOF
+# systemctl daemon-reload
+# systemctl enable kamiwaza.service
+# msg_ok "Created systemd service"
 
-chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
-chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
+# chown -R kamiwaza:kamiwaza "$KAMIWAZA_DIR"
+# chown -R kamiwaza:kamiwaza "$KAMIWAZA_LOG_DIR"
 
-msg_info "Starting KamiWaza service"
-systemctl start kamiwaza.service
+# msg_info "Starting KamiWaza service"
+# systemctl start kamiwaza.service
+# msg_ok "Started KamiWaza service"
+
+bash startup/kamiwazad.sh start
 msg_ok "Started KamiWaza service"
 
 msg_info "Saving access information"
