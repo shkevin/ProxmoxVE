@@ -9,9 +9,9 @@ APP="KamiWazaAI"
 var_tags="${var_tags:-ai;machine-learning;docker;gpu}"
 var_cpu="${var_cpu:-8}"
 var_ram="${var_ram:-16384}"
-var_disk="${var_disk:-25}"
-var_os="${var_os:-ubuntu}"
-var_version="${var_version:-22.04}"
+var_disk="${var_disk:-35}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-0}"
 
 # App Output & Base Settings
@@ -87,13 +87,3 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
-echo -e "${INFO}${YW} Access it using the following URL:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}https://${IP}${CL}"
-echo -e "${INFO}${YW} Default Credentials:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}Username: admin${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}Password: kamiwaza${CL}"
-echo -e "${INFO}${YW} System Info:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}Memory: 16GB+ (Minimum for KamiWaza)${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}Storage: 25GB (10GB+ required)${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}Service: systemctl {start|stop|restart|status} kamiwaza${CL}"
