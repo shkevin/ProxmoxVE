@@ -33,8 +33,6 @@ StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
-User=kamiwaza
-Group=kamiwaza
 WorkingDirectory=/opt/kamiwaza
 Environment=KAMIWAZA_LOG_DIR=/opt/kamiwaza/logs
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -57,7 +55,7 @@ EOF
 msg_info "Starting Kamiwaza service"
 systemctl daemon-reload
 systemctl enable kamiwaza
-systemctl start kamiwaza
+$STD kamiwaza start
 msg_ok "Kamiwaza service started"
 
 msg_info "Saving access information"
