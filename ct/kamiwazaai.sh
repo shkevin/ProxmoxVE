@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-8}"
 var_ram="${var_ram:-16384}"
 var_disk="${var_disk:-50}"
 var_os="${var_os:-ubuntu}"
-var_version="${var_version:-22.04}"
+var_version="${var_version:-24.04}"
 var_unprivileged="${var_unprivileged:-0}"
 
 # App Output & Base Settings
