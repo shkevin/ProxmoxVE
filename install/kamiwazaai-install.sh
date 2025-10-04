@@ -11,54 +11,11 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt-get install -y \
-    curl \
-    gnupg \
-    ca-certificates \
-    apt-transport-https \
-    lsb-release \
-    software-properties-common \
-    net-tools \
-    jq \
-    bc
-msg_ok "Installed Dependencies"
-
-msg_info "Installing Python 3.12"
-$STD apt-get update
-$STD apt-get install -y \
-    python3.12 \
-    python3.12-dev \
-    python3.12-venv \
-    python-is-python3
-msg_ok "Installed Python 3.12"
-
-msg_info "Installing Docker"
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg &>/dev/null
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-$STD apt-get update
-$STD apt-get install -y docker-ce docker-ce-cli containerd.io
-mkdir -p /usr/local/lib/docker/cli-plugins
-curl -SL "https://github.com/docker/compose/releases/download/v2.39.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose
-chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-msg_ok "Installed Docker Engine + Compose v2"
-
 msg_info "Adding Kamiwaza APT Repository"
 curl -fsSL https://packages.kamiwaza.ai/gpg | gpg --dearmor -o /usr/share/keyrings/kamiwaza-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/kamiwaza-archive-keyring.gpg] https://packages.kamiwaza.ai/ubuntu/ noble main" | tee /etc/apt/sources.list.d/kamiwaza.list
 $STD apt-get update
 msg_ok "Added Kamiwaza APT Repository"
-
-msg_info "Creating kamiwaza user"
-$STD useradd -m -s /bin/bash kamiwaza
-msg_ok "Created kamiwaza user"
-
-msg_info "Installing Node.js"
-NODE_VERSION="22" NODE_MODULE="pm2@latest" setup_nodejs
-
-msg_info "Adding kamiwaza user to docker group"
-$STD usermod -aG docker kamiwaza
-msg_ok "Added kamiwaza user to docker group"
 
 msg_info "Installing Kamiwaza"
 export DEBIAN_FRONTEND=noninteractive
@@ -71,8 +28,7 @@ cat <<EOF >/etc/systemd/system/kamiwaza.service
 [Unit]
 Description=Kamiwaza AI Platform
 Documentation=https://docs.kamiwaza.ai
-After=network.target docker.service
-Wants=docker.service
+After=network.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
 
