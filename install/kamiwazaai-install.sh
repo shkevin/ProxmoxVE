@@ -49,27 +49,22 @@ echo "deb [signed-by=/usr/share/keyrings/kamiwaza-archive-keyring.gpg] https://p
 $STD apt-get update
 msg_ok "Added Kamiwaza APT Repository"
 
+msg_info "Creating kamiwaza user"
+$STD useradd -m -s /bin/bash kamiwaza
+msg_ok "Created kamiwaza user"
+
+msg_info "Installing Node.js"
+NODE_VERSION="22" NODE_MODULE="pm2@latest" setup_nodejs
+
+msg_info "Adding kamiwaza user to docker group"
+$STD usermod -aG docker kamiwaza
+msg_ok "Added kamiwaza user to docker group"
+
 msg_info "Installing Kamiwaza"
 export DEBIAN_FRONTEND=noninteractive
 export KAMIWAZA_INSTALL_MODE=unattended
 $STD apt-get install -y kamiwaza
 msg_ok "Installed Kamiwaza package"
-
-msg_info "Creating kamiwaza user"
-if ! id "kamiwaza" &>/dev/null; then
-    $STD useradd -m -s /bin/bash kamiwaza
-    msg_ok "Created kamiwaza user"
-else
-    msg_ok "Kamiwaza user already exists"
-fi
-
-msg_info "Installing pm2 for kamiwaza user"
-$STD sudo -u kamiwaza sh -c 'npm install -g pm2'
-msg_ok "Installed pm2 for kamiwaza user"
-
-msg_info "Adding kamiwaza user to docker group"
-$STD usermod -aG docker kamiwaza
-msg_ok "Added kamiwaza user to docker group"
 
 msg_info "Creating kamiwaza service"
 cat <<EOF >/etc/systemd/system/kamiwaza.service
