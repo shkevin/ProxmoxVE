@@ -10,14 +10,11 @@ source /dev/stdin <<<$(curl -fsSL https://raw.githubusercontent.com/community-sc
 function header_info() {
   clear
   cat <<"EOF"
- _  __               _  _    _                     _____  ___
-| |/ /__ _ _ __ ___ (_)| |  | | __ _ ______ _     |  _  ||   |
-|   // _` | '_ ` _ \| || |/\| |/ _` |_  / _` |    |     || | |
-|  \| (_| | | | | | | ||   /\   (_| |/ / (_| |    |__|__||_|_|
-|_|\_\__,_|_| |_| |_|_||__/  \__\__,_/___\__,_|    ___     ___
-                                                  |   |   |   |
-                                                  |  _|   |  _|
-                                                  |_|     |_|
+ _  __               _  _    _                     _    ___   _    ____  ___
+| |/ /__ _ _ __ ___ (_)| |  | | __ _ ______ _      / \  |_ _| | |  / /  |/  /
+|   // _` | '_ ` _ \| || |/\| |/ _` |_  / _` |    / _ \  | |  | | / / /|_/ /
+|  \| (_| | | | | | | ||   /\   (_| |/ / (_| |   / ___ \ | |  | |/ / /  / /
+|_|\_\__,_|_| |_| |_|_||__/  \__\__,_/___\__,_| /_/   \_\___| |___/_/  /_/
 
 EOF
 }
@@ -62,7 +59,6 @@ MACADDRESS="${TAB}🔗${TAB}${CL}"
 VLANTAG="${TAB}🏷️${TAB}${CL}"
 CREATING="${TAB}🚀${TAB}${CL}"
 ADVANCED="${TAB}🧩${TAB}${CL}"
-CLOUD="${TAB}☁️${TAB}${CL}"
 
 THIN="discard=on,ssd=1,"
 set -e
@@ -209,7 +205,7 @@ function exit-script() {
 function default_settings() {
   VMID=$(get_valid_nextid)
   FORMAT=",efitype=4m"
-  MACHINE=""
+  MACHINE="q35"
   DISK_CACHE=""
   DISK_SIZE="50G"
   HN="kamiwazaai"
@@ -506,6 +502,7 @@ fi
 
 msg_info "Adding KamiWaza AI to Ubuntu 24.04 Disk Image"
 virt-customize -q -a "${FILE}" --install qemu-guest-agent,curl,gnupg,software-properties-common,lsb-release >/dev/null &&
+  virt-customize -q -a "${FILE}" --run-command "rm -f /etc/apt/sources.list.d/docker.list" >/dev/null &&
   virt-customize -q -a "${FILE}" --run-command "curl -fsSL https://packages.kamiwaza.ai/gpg | gpg --dearmor -o /usr/share/keyrings/kamiwaza-archive-keyring.gpg" >/dev/null &&
   virt-customize -q -a "${FILE}" --run-command "echo 'deb [signed-by=/usr/share/keyrings/kamiwaza-archive-keyring.gpg] https://packages.kamiwaza.ai/ubuntu/ noble main' > /etc/apt/sources.list.d/kamiwaza.list" >/dev/null &&
   virt-customize -q -a "${FILE}" --run-command "apt-get update -qq" >/dev/null &&
