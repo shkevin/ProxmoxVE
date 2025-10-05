@@ -12,9 +12,10 @@ network_check
 update_os
 
 msg_info "Adding Kamiwaza APT Repository"
-curl -fsSL https://packages.kamiwaza.ai/gpg | gpg --dearmor -o /usr/share/keyrings/kamiwaza-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/kamiwaza-archive-keyring.gpg] https://packages.kamiwaza.ai/ubuntu/ noble main" | tee /etc/apt/sources.list.d/kamiwaza.list
+curl -fsSL https://packages.kamiwaza.ai/gpg | gpg --dearmor -o /usr/share/keyrings/kamiwaza-archive-keyring.gpg
 $STD apt-get update
+$STD apt-get upgrade
 msg_ok "Added Kamiwaza APT Repository"
 
 msg_info "Installing Kamiwaza"
@@ -22,41 +23,6 @@ export DEBIAN_FRONTEND=noninteractive
 export KAMIWAZA_INSTALL_MODE=unattended
 $STD apt-get install -y kamiwaza
 msg_ok "Installed Kamiwaza package"
-
-msg_info "Creating kamiwaza service"
-cat <<EOF >/etc/systemd/system/kamiwaza.service
-[Unit]
-Description=Kamiwaza AI Platform
-Documentation=https://docs.kamiwaza.ai
-After=network.target
-StartLimitIntervalSec=300
-StartLimitBurst=5
-
-[Service]
-WorkingDirectory=/opt/kamiwaza
-Environment=KAMIWAZA_LOG_DIR=/opt/kamiwaza/logs
-Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-ExecStart=kamiwaza start
-ExecStop=kamiwaza stop
-ExecReload=kamiwaza restart
-
-Restart=on-failure
-RestartSec=10
-TimeoutStartSec=300
-TimeoutStopSec=120
-KillMode=mixed
-KillSignal=SIGTERM
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-msg_info "Starting Kamiwaza service"
-systemctl daemon-reload
-systemctl enable kamiwaza
-$STD kamiwaza start
-msg_ok "Kamiwaza service started"
 
 msg_info "Saving access information"
 TOTAL_MEM=$(free -m | awk 'NR==2{printf "%.0f", $2}')
