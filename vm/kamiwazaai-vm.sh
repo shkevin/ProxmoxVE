@@ -496,7 +496,10 @@ done
 if ! command -v virt-customize &>/dev/null; then
   msg_info "Installing Pre-Requisite libguestfs-tools onto Host"
   # Clean up any problematic repository files first
-  rm -f /etc/apt/sources.list.d/docker.list
+  rm -f /etc/apt/sources.list.d/docker.list 2>/dev/null || true
+  rm -f /etc/apt/sources.list.d/docker-ce.list 2>/dev/null || true
+  # Also clean up any Docker GPG keys that might be problematic
+  rm -f /usr/share/keyrings/docker-archive-keyring.gpg 2>/dev/null || true
   apt-get -qq update >/dev/null
   apt-get -qq install libguestfs-tools lsb-release -y >/dev/null
   msg_ok "Installed libguestfs-tools successfully"
