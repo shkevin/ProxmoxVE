@@ -20,9 +20,17 @@ msg_ok "Added Kamiwaza APT Repository"
 
 msg_info "Installing Kamiwaza"
 export DEBIAN_FRONTEND=noninteractive
-export KAMIWAZA_INSTALL_MODE=unattended
+# export KAMIWAZA_INSTALL_MODE=unattended
 $STD apt-get install -y kamiwaza
 msg_ok "Installed Kamiwaza package"
+
+msg_info "Starting Kamiwaza service"
+$STD kamiwaza start
+msg_ok "Kamiwaza service started"
+
+msg_info "Waiting for Kamiwaza to start"
+$STD kamiwaza start -w
+msg_ok "KamiWaza is ready"
 
 msg_info "Saving access information"
 TOTAL_MEM=$(free -m | awk 'NR==2{printf "%.0f", $2}')
