@@ -14,12 +14,12 @@ update_os
 msg_info "Adding Kamiwaza APT Repository"
 echo "deb [signed-by=/usr/share/keyrings/kamiwaza-archive-keyring.gpg] https://packages.kamiwaza.ai/ubuntu/ noble main" | tee /etc/apt/sources.list.d/kamiwaza.list
 curl -fsSL https://packages.kamiwaza.ai/gpg | gpg --dearmor -o /usr/share/keyrings/kamiwaza-archive-keyring.gpg
-$STD apt-get update
-$STD apt-get upgrade
+$STD apt-get update -y
+$STD apt-get upgrade -y
 msg_ok "Added Kamiwaza APT Repository"
 
 msg_info "Installing Kamiwaza"
-export DEBIAN_FRONTEND=noninteractive
+# export DEBIAN_FRONTEND=noninteractive
 # export KAMIWAZA_INSTALL_MODE=unattended
 $STD apt-get install -y kamiwaza
 msg_ok "Installed Kamiwaza package"
